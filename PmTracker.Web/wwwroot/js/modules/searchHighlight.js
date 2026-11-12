@@ -116,7 +116,7 @@ export function findHighlightRanges(texts, pattern) {
 }
 
 // Formátovaný text (popis záznamu, vyjádření, komentáře) — viz _ZaznamDetailPartial.cshtml,
-// _ZaznamCommentsPartial.cshtml, Jednani/_TaskItemPartial.cshtml. Jen tady se smí fráze
+// _ZaznamCommentsPartial.cshtml. Jen tady se smí fráze
 // spojit přes formátování i přes <br>/odstavec/položku seznamu (review M1) — mimo tento
 // container (karta samotná je plain <div>) se nic nespojuje, jinak popisek a hodnota vedle
 // sebe (<s>Jan Novák</s> <strong>Pavel Dvořák</strong>) dají falešnou frázi (review M2).

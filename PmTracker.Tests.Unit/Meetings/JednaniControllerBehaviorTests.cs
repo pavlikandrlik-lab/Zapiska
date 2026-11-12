@@ -15,54 +15,6 @@ namespace PmTracker.Tests.Unit.Meetings;
 public sealed class JednaniControllerBehaviorTests
 {
     [Fact]
-    public async Task TaskItemPartial_ShouldBuildPartialFromSingleTaskAndMeetingListAsync()
-    {
-        var meetingService = new FakeMeetingService
-        {
-            MeetingProjectId = 42,
-            SingleTask = new JednaniUkolViewModel
-            {
-                ZaznamId = 15,
-                CisloZaznamu = 15,
-                CisloViditelne = "15",
-                Popis = "Ukol",
-                LzeUpravovatVyjadreni = true,
-                SubsystemLeadEquivalentOsobaIds = [],
-                Vyjadreni = []
-            },
-            Meetings =
-            [
-                new JednaniListItemViewModel
-                {
-                    Id = 7,
-                    CisloJednani = 3,
-                    Datum = new DateTime(2026, 1, 1),
-                    CasZacatek = new TimeOnly(9, 0),
-                    Misto = "Zasedacka",
-                    Stav = "Otevreno",
-                    StavKod = "OPEN"
-                }
-            ]
-        };
-        var controller = CreateController(meetingService);
-
-        var result = await controller.TaskItemPartial(7, 15);
-
-        var partial = result.Should().BeOfType<PartialViewResult>().Subject;
-        partial.ViewName.Should().Be("_TaskItemPartial");
-        var model = partial.Model.Should().BeOfType<JednaniTaskItemPartialViewModel>().Subject;
-        model.ProjektId.Should().Be(42);
-        model.JednaniId.Should().Be(7);
-        model.JednaniCislo.Should().Be(3);
-        model.CanEditRecordNotes.Should().BeTrue();
-        model.CanCommentAsSubsystemLeader.Should().BeFalse();
-        meetingService.BuildJednaniDetailCalls.Should().Be(0);
-        meetingService.GetMeetingProjectIdCalls.Should().Be(1);
-        meetingService.GetSingleTaskCalls.Should().Be(1);
-        meetingService.BuildJednaniListAsyncCalls.Should().Be(1);
-    }
-
-    [Fact]
     public async Task Index_ShouldPassAccessibleProjectFilterToMeetingOverviewAsync()
     {
         var meetingService = new FakeMeetingService
@@ -216,7 +168,6 @@ public sealed class JednaniControllerBehaviorTests
     private sealed class FakeMeetingService : IMeetingService
     {
         public int? MeetingProjectId { get; set; }
-        public JednaniUkolViewModel? SingleTask { get; set; }
         public IReadOnlyList<JednaniListItemViewModel> Meetings { get; set; } = [];
         public IReadOnlyList<JednaniProjektListItemViewModel> Overview { get; set; } = [];
         public IReadOnlyList<int>? OverviewProjectIds { get; private set; }
@@ -224,7 +175,6 @@ public sealed class JednaniControllerBehaviorTests
         public MeetingModalViewModel? NewMeetingModalResult { get; set; }
         public int BuildJednaniDetailCalls { get; private set; }
         public int GetMeetingProjectIdCalls { get; private set; }
-        public int GetSingleTaskCalls { get; private set; }
         public int BuildJednaniListAsyncCalls { get; private set; }
         public int BuildNewMeetingModalCalls { get; private set; }
 
@@ -261,12 +211,6 @@ public sealed class JednaniControllerBehaviorTests
         {
             GetMeetingProjectIdCalls += 1;
             return Task.FromResult(MeetingProjectId);
-        }
-
-        public Task<JednaniUkolViewModel?> GetSingleTaskAsync(int meetingId, int zaznamId, CancellationToken ct = default)
-        {
-            GetSingleTaskCalls += 1;
-            return Task.FromResult(SingleTask);
         }
 
         public Task<IReadOnlyList<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(int projectId, int meetingId, CancellationToken ct = default)

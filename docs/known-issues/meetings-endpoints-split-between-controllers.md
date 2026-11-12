@@ -28,7 +28,7 @@ Seznam, detail a vnitřní akce jednání:
 |---|---|---|
 | Index | `GET /Jednani?projektId=…` | `auth` + `CanAccessProject` filtr |
 | Detail | `GET /Jednani/Detail/{id}` | `auth` + `CanAccessProject` |
-| TaskItemPartial | `GET /Jednani/TaskItemPartial` | `records.edit` / `records.comment.subsystemlead` |
+| ~~TaskItemPartial~~ | ~~`GET /Jednani/TaskItemPartial`~~ | odstraněno 2026-11-11 (spec vyjádření R8) |
 | AddMeetingParticipantModal | `GET /Jednani/AddMeetingParticipantModal` | `meetings.edit` |
 | AddMeetingParticipant | `POST /Jednani/AddMeetingParticipant` | `meetings.edit` (imperativní) |
 | SaveStatus | `POST /Jednani/SaveStatus` | `meetings.edit` (imperativní) |
@@ -67,7 +67,7 @@ Seznam, detail a vnitřní akce jednání:
 | **EditMeetingModal** (přesunuto) | `GET /Jednani/EditMeetingModal?projektId=...&meetingId=...` | `meetings.edit` |
 | **SaveMeeting** (přesunuto) | `POST /Jednani/Save` | `meetings.create` / `meetings.edit` |
 | **DeleteMeeting** (přesunuto) | `POST /Jednani/Delete` | `meetings.edit` |
-| TaskItemPartial | `GET /Jednani/TaskItemPartial` | `records.edit` / `records.comment.subsystemlead` |
+| ~~TaskItemPartial~~ | ~~`GET /Jednani/TaskItemPartial`~~ | odstraněno 2026-11-11 (spec vyjádření R8) |
 | AddMeetingParticipantModal | `GET /Jednani/AddMeetingParticipantModal` | `meetings.edit` |
 | AddMeetingParticipant | `POST /Jednani/AddMeetingParticipant` | `meetings.edit` |
 | SaveStatus | `POST /Jednani/SaveStatus` | `meetings.edit` |
