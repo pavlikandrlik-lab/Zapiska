@@ -154,7 +154,6 @@ public sealed class JednaniControllerExceptionHandlingTests
         public Task<MeetingModalViewModel?> BuildEditMeetingModalAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool?> IsMeetingEditableAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<JednaniDetailViewModel> BuildJednaniDetailAsync(int id, CancellationToken ct = default) => throw new NotSupportedException();
-        public Task<JednaniUkolViewModel?> GetSingleTaskAsync(int meetingId, int zaznamId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(int projectId, int meetingId, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> SaveMeetingAsync(SaveMeetingCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();
         public Task DeleteMeetingAsync(DeleteMeetingCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default) => throw new NotSupportedException();

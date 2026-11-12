@@ -71,22 +71,31 @@ public sealed class ProjectRoleCacheTests
         ids.Should().Equal(5001);
     }
 
-    private static async Task SeedLeadAssignmentAsync(
-        PmTrackerDbContext db, int projectId, int subsystemId, int osobaId)
+    private static Task SeedLeadAssignmentAsync(PmTrackerDbContext db, int projectId, int subsystemId, int osobaId)
+        => SeedRoleAssignmentAsync(db, projectId, subsystemId, osobaId, SubsystemRoleCodes.Lead);
+
+    private static readonly IReadOnlyDictionary<string, int> RoleIds = new Dictionary<string, int>
     {
-        // Ciselnik s lead kódem (deduplikace kvůli idempotenci testu).
-        if (!db.CiselnikRoliSubsystemu.Any(x => x.Kod == SubsystemRoleCodes.Lead))
+        [SubsystemRoleCodes.Lead] = 1,
+        [SubsystemRoleCodes.DeputyLead] = 2,
+        [SubsystemRoleCodes.Methodik] = 3
+    };
+
+    private static async Task SeedRoleAssignmentAsync(
+        PmTrackerDbContext db, int projectId, int subsystemId, int osobaId, string roleCode, DateTime? datumOdebrani = null)
+    {
+        if (!db.CiselnikRoliSubsystemu.Any(x => x.Kod == roleCode))
         {
             db.CiselnikRoliSubsystemu.Add(new CiselnikRoleSubsystemuEntity
             {
-                Id = 1,
-                Kod = SubsystemRoleCodes.Lead,
-                Nazev = "Lead"
+                Id = RoleIds[roleCode],
+                Kod = roleCode,
+                Nazev = roleCode
             });
             await db.SaveChangesAsync();
         }
 
-        var leadRoleId = db.CiselnikRoliSubsystemu.First(x => x.Kod == SubsystemRoleCodes.Lead).Id;
+        var roleId = db.CiselnikRoliSubsystemu.First(x => x.Kod == roleCode).Id;
 
         var projektSubsystem = db.ProjektSubsystemy.FirstOrDefault(x =>
             x.ProjektId == projectId && x.SubsystemId == subsystemId);
@@ -106,10 +115,70 @@ public sealed class ProjectRoleCacheTests
         {
             ProjektSubsystemId = projektSubsystem.Id,
             OsobaId = osobaId,
-            RoleSubsystemuId = leadRoleId,
-            DatumPrirazeni = DateTime.UtcNow
+            RoleSubsystemuId = roleId,
+            DatumPrirazeni = DateTime.UtcNow.AddDays(-10),
+            DatumOdebrani = datumOdebrani
         });
         await db.SaveChangesAsync();
+    }
+
+    /// <summary>5001 vedoucí, 5002 zástupce, 5003 metodik subsystému 100; 5004 metodik subsystému 200.</summary>
+    private static async Task SeedAllRolesAsync(PmTrackerDbContext db, DateTime? metodik5003Odebran = null)
+    {
+        await SeedRoleAssignmentAsync(db, 10, 100, 5001, SubsystemRoleCodes.Lead);
+        await SeedRoleAssignmentAsync(db, 10, 100, 5002, SubsystemRoleCodes.DeputyLead);
+        await SeedRoleAssignmentAsync(db, 10, 100, 5003, SubsystemRoleCodes.Methodik, metodik5003Odebran);
+        await SeedRoleAssignmentAsync(db, 10, 200, 5004, SubsystemRoleCodes.Methodik);
+    }
+
+    // Spec 2026-11-10 R3: pro vyjádření se počítají všechny tři subsystémové role, metodik včetně.
+
+    [Fact]
+    public async Task Subsystemove_role_obsahuji_vedouciho_zastupce_i_metodika_jen_sveho_subsystemu()
+    {
+        await using var db = CreateDb();
+        await SeedAllRolesAsync(db);
+        var cache = new ProjectRoleCache(db);
+
+        (await cache.GetSubsystemRoleOsobaIdsAsync(10, 100)).Should().Equal(5001, 5002, 5003);
+        (await cache.GetSubsystemRoleOsobaIdsAsync(10, 200)).Should().Equal(5004);
+        (await cache.GetSubsystemRoleOsobaIdsAsync(10, 300)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Seznam_vedoucich_dal_metodika_neobsahuje()
+    {
+        await using var db = CreateDb();
+        await SeedAllRolesAsync(db);
+        var cache = new ProjectRoleCache(db);
+
+        (await cache.GetLeadEquivalentOsobaIdsAsync(10, 100)).Should().Equal(5001, 5002);
+        (await cache.GetLeadEquivalentOsobaIdsAsync(10, 200)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Odebrany_metodik_neni_v_seznamu()
+    {
+        await using var db = CreateDb();
+        await SeedAllRolesAsync(db, metodik5003Odebran: DateTime.UtcNow.AddDays(-1));
+        var cache = new ProjectRoleCache(db);
+
+        (await cache.GetSubsystemRoleOsobaIdsAsync(10, 100)).Should().Equal(5001, 5002);
+    }
+
+    [Fact]
+    public async Task Subsystemove_role_druhe_volani_vrati_tutez_instanci()
+    {
+        await using var db = CreateDb();
+        await SeedAllRolesAsync(db);
+        var cache = new ProjectRoleCache(db);
+
+        var first = await cache.GetSubsystemRoleOsobaIdsBySubsystemAsync(10);
+        await SeedRoleAssignmentAsync(db, 10, 300, 5009, SubsystemRoleCodes.Methodik);
+        var second = await cache.GetSubsystemRoleOsobaIdsBySubsystemAsync(10);
+
+        first.Should().BeSameAs(second);
+        second.Should().NotContainKey(300);
     }
 
     private static PmTrackerDbContext CreateDb()

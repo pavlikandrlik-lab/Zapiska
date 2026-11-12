@@ -103,4 +103,8 @@ public sealed partial class RecordService : IRecordService
     public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(
         int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
         => commentService.GetMeetingIdsAllowingNewCommentAsync(zaznamId, meetings, currentUser, ct);
+
+    public Task<IReadOnlyDictionary<int, CommentActions>> GetCommentActionsAsync(
+        int zaznamId, IReadOnlyCollection<int> commentIds, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+        => commentService.GetCommentActionsAsync(zaznamId, commentIds, currentUser, ct);
 }

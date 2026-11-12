@@ -155,60 +155,6 @@ public sealed partial class JednaniController : BaseController
     }
 
     [HttpGet]
-    public async Task<IActionResult> TaskItemPartial(int jednaniId, int zaznamId, CancellationToken ct = default)
-    {
-        var projektId = await _meetingService.GetMeetingProjectIdAsync(jednaniId, ct);
-        if (!projektId.HasValue)
-        {
-            return NotFound();
-        }
-
-        if (!CurrentUserContext.CanAccessProject(projektId.Value))
-        {
-            return NotFound();
-        }
-
-        var ukol = await _meetingService.GetSingleTaskAsync(jednaniId, zaznamId, ct);
-        if (ukol is null)
-        {
-            return NotFound();
-        }
-
-        var meetings = await _meetingService.BuildJednaniListAsync(projektId.Value, ct);
-        var meeting = meetings.FirstOrDefault(x => x.Id == jednaniId);
-        if (meeting is null)
-        {
-            return NotFound();
-        }
-
-        var isRelevantSubsystemLeader = ukol.SubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
-        // F4 redesign 2026-04-23: "editace zápisu" = meetings.notes.edit (per-action);
-        // subsystem lead = meetings.notes.subsystemlead + lead-equivalent + DRAFT.
-        var canEditRecordNotes = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesEdit, projektId.Value)
-            && ukol.LzeUpravovatVyjadreni;
-        var isDraftMeeting = string.Equals(meeting.StavKod, "DRAFT", StringComparison.OrdinalIgnoreCase);
-        var canCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId.Value)
-            && isRelevantSubsystemLeader
-            && isDraftMeeting
-            && ukol.LzeUpravovatVyjadreni;
-        if (!canEditRecordNotes && !canCommentAsSubsystemLeader && !isRelevantSubsystemLeader)
-        {
-            return Forbid();
-        }
-
-        return PartialView("_TaskItemPartial", new JednaniTaskItemPartialViewModel
-        {
-            ProjektId = projektId.Value,
-            JednaniId = meeting.Id,
-            JednaniCislo = meeting.CisloJednani,
-            CanEditRecordNotes = canEditRecordNotes,
-            CanCommentAsSubsystemLeader = canCommentAsSubsystemLeader,
-            CurrentUserOsobaId = CurrentUserContext.OsobaId,
-            Ukol = ukol
-        });
-    }
-
-    [HttpGet]
     [Authorize(Policy = "permission:meetings.participant.add")]
     public async Task<IActionResult> AddMeetingParticipantModal(int projektId, int jednaniId, CancellationToken ct = default)
     {

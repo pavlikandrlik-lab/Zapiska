@@ -88,7 +88,7 @@ export function applyCommentSort(section, direction) {
                     || (aId - bId);
             });
 
-            // Panel vyjádření (spec 2026-10-22) i _TaskItemPartial řadí přímo řádky
+            // Panel vyjádření (spec 2026-10-22) řadí přímo řádky
             // [data-comment-item]; obal [data-comment-wrapper] (meta nad dlaždicí) už markup nemá.
             items.forEach((item) => {
                 const movable = item.closest("[data-comment-wrapper]") || item;

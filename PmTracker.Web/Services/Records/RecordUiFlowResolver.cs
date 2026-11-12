@@ -2,27 +2,18 @@ using Microsoft.AspNetCore.Routing;
 
 namespace PmTracker.Web.Services.Records;
 
+/// <summary>
+/// Kam po uložení vyjádření obnovit / přesměrovat. Kontext „meeting“ (blok úkolu jednání,
+/// _TaskItemPartial) zanikl se spec 2026-11-10 R8 — vyjádření se v jednání obnovují panelem
+/// záznamu (RecordCommentsPartial s kontextJednaniId).
+/// </summary>
 public sealed class RecordUiFlowResolver : IRecordUiFlowResolver
 {
     private const string UiContextProject = "project";
-    private const string UiContextMeeting = "meeting";
     private const string RecordsTab = "zaznamy";
 
     public RecordCommentAjaxFlow ResolveCommentAjaxFlow(string? uiContext, int projektId, int zaznamId, int? meetingId, int? kontextJednaniId = null)
     {
-        if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
-        {
-            return new RecordCommentAjaxFlow
-            {
-                RefreshScope = "meeting-task-item",
-                ControllerName = "Jednani",
-                ActionName = "TaskItemPartial",
-                RouteValues = new RouteValueDictionary(new { jednaniId = meetingId.Value, zaznamId }),
-                UiContext = UiContextMeeting,
-                MeetingId = meetingId.Value
-            };
-        }
-
         return new RecordCommentAjaxFlow
         {
             RefreshScope = "record-comments",
@@ -37,16 +28,6 @@ public sealed class RecordUiFlowResolver : IRecordUiFlowResolver
 
     public RecordCommentRedirectFlow ResolveCommentRedirectFlow(string? uiContext, int projektId, int? meetingId, string? localReturnUrl)
     {
-        if (string.Equals(uiContext, UiContextMeeting, StringComparison.OrdinalIgnoreCase) && meetingId.HasValue)
-        {
-            return new RecordCommentRedirectFlow
-            {
-                ControllerName = "Jednani",
-                ActionName = "Detail",
-                RouteValues = new RouteValueDictionary(new { id = meetingId.Value })
-            };
-        }
-
         if (string.Equals(uiContext, UiContextProject, StringComparison.OrdinalIgnoreCase))
         {
             return new RecordCommentRedirectFlow

@@ -10,7 +10,6 @@ namespace PmTracker.Web.Services;
 public sealed partial class MeetingService
 {
     private static readonly StringComparer Ci = StringComparer.OrdinalIgnoreCase;
-    private const byte RecordDisplayNumberTypeMeeting = 1;
 
     private sealed record ActiveProjectMembershipRow(
         int OsobaId,
@@ -51,7 +50,6 @@ public sealed partial class MeetingService
         // legacy fallback i kandidáti modalu (dřív se BuildActiveProjectMembershipRowsAsync volal 2×).
         var membershipRows = await BuildActiveProjectMembershipRowsAsync(project.Id, ct);
         var attendance = await BuildMeetingAttendanceAsync(id, membershipRows, ct);
-        var taskRows = await BuildMeetingTasksAsync(id, project.Id, ct);
         var meetingStatusesRaw = await dbContext.CiselnikStavuJednani.AsNoTracking()
             .OrderBy(x => x.Id)
             .Select(x => new { x.Kod, x.Nazev })
@@ -99,7 +97,6 @@ public sealed partial class MeetingService
             OtevrenyStavKod = openStatusCode,
             UzavrenyStavKod = closedStatusCode,
             Ucast = attendance,
-            Ukoly = taskRows,
             AvailableParticipantCandidates = await BuildMeetingParticipantCandidatesAsync(project.Id, meeting.Id, includeAlreadyPresent: false, membershipRows, ct),
             StavyJednani = meetingStatuses,
             StavyUcasti = attendanceStatuses
@@ -116,76 +113,6 @@ public sealed partial class MeetingService
 
     public async Task<IReadOnlyList<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(int projectId, int meetingId, CancellationToken ct = default)
         => await BuildMeetingParticipantCandidatesAsync(projectId, meetingId, includeAlreadyPresent: false, ct);
-
-    public async Task<JednaniUkolViewModel?> GetSingleTaskAsync(int meetingId, int zaznamId, CancellationToken ct = default)
-    {
-        var meeting = await dbContext.Jednani.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == meetingId, ct);
-        if (meeting is null)
-        {
-            return null;
-        }
-
-        var stateCodesById = await dbContext.CiselnikStavuUkolu.AsNoTracking()
-            .ToDictionaryAsync(x => x.Id, x => x.Kod, ct);
-        var record = await dbContext.ProjektoveZaznamy.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == zaznamId && x.ProjektId == meeting.ProjektId, ct);
-        if (record is null)
-        {
-            return null;
-        }
-
-        var stavKod = record.StavUkoluId.HasValue && stateCodesById.TryGetValue(record.StavUkoluId.Value, out var code)
-            ? code
-            : null;
-        if (!IsMeetingTaskVisible(stavKod))
-        {
-            return null;
-        }
-
-        var commentsForRecord = await dbContext.Vyjadreni.AsNoTracking()
-            .Where(x => x.JednaniId == meetingId && x.ZaznamId == zaznamId)
-            .OrderBy(x => x.DatumVyjadreni)
-            .ThenBy(x => x.Id)
-            .ToListAsync(ct);
-        var requiredPersonIds = commentsForRecord
-            .Select(x => x.AutorOsobaId)
-            .Distinct()
-            .ToList();
-        var people = requiredPersonIds.Count == 0
-            ? new Dictionary<int, OsobaEntity>()
-            : await dbContext.Osoby.AsNoTracking()
-                .Where(x => requiredPersonIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
-        var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(meeting.ProjektId, ct);
-        var meetingState = await dbContext.CiselnikStavuJednani.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-        var canModify = !IsMeetingReadOnly(meeting, meetingState);
-        var isDraftMeeting = string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
-
-        return new JednaniUkolViewModel
-        {
-            ZaznamId = record.Id,
-            CisloZaznamu = record.CisloZaznamu,
-            CisloViditelne = ResolveVisibleRecordNumber(record),
-            Popis = record.Nazev,
-            Zapis = string.Empty,
-            LzeUpravovatVyjadreni = canModify,
-            SubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
-            Vyjadreni = commentsForRecord
-                .Select(comment => new JednaniVyjadreniViewModel
-                {
-                    Id = comment.Id,
-                    AutorOsobaId = comment.AutorOsobaId,
-                    Autor = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(comment.AutorOsobaId)),
-                    Datum = comment.DatumVyjadreni,
-                    Text = comment.TextVyjadreni,
-                    LzeUpravit = canModify,
-                    CanEditOwnAsSubsystemLeader = canModify && isDraftMeeting
-                })
-                .ToList()
-        };
-    }
 
     private async Task<List<UcastViewModel>> BuildMeetingAttendanceAsync(
         int meetingId,
@@ -262,78 +189,6 @@ public sealed partial class MeetingService
                 AktivniRole = item.AktivniRole
             })
             .ToList();
-    }
-
-    private async Task<List<JednaniUkolViewModel>> BuildMeetingTasksAsync(int meetingId, int projectId, CancellationToken ct)
-    {
-        var projectRecords = await dbContext.ProjektoveZaznamy.AsNoTracking()
-            .Where(x => x.ProjektId == projectId)
-            .ToListAsync(ct);
-        var stateCodesById = await dbContext.CiselnikStavuUkolu.AsNoTracking()
-            .ToDictionaryAsync(x => x.Id, x => x.Kod, ct);
-        projectRecords = projectRecords
-            .Where(x =>
-            {
-                var stavKod = x.StavUkoluId.HasValue && stateCodesById.TryGetValue(x.StavUkoluId.Value, out var code)
-                    ? code
-                    : null;
-                return IsMeetingTaskVisible(stavKod);
-            })
-            .ToList();
-        projectRecords = OrderRecordsByVisibleNumber(projectRecords).ToList();
-        var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
-
-        var commentRows = await dbContext.Vyjadreni.AsNoTracking()
-            .Where(x => x.JednaniId == meetingId)
-            .OrderBy(x => x.Id)
-            .ToListAsync(ct);
-        var commentsByRecord = commentRows
-            .GroupBy(x => x.ZaznamId)
-            .ToDictionary(group => group.Key, group => group.ToList());
-
-        var requiredPersonIds = projectRecords
-            .Select(record => record.VlastnikId)
-            .Concat(commentRows.Select(comment => comment.AutorOsobaId))
-            .Distinct()
-            .ToList();
-        var people = requiredPersonIds.Count == 0
-            ? new Dictionary<int, OsobaEntity>()
-            : await dbContext.Osoby.AsNoTracking()
-                .Where(x => requiredPersonIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id, ct);
-        var meeting = await dbContext.Jednani.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == meetingId, ct);
-        var meetingState = meeting is null
-            ? null
-            : await dbContext.CiselnikStavuJednani.AsNoTracking()
-                .FirstOrDefaultAsync(x => x.Id == meeting.StavJednaniId, ct);
-        var canModify = !IsMeetingReadOnly(meeting, meetingState);
-        var isDraftMeeting = string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase);
-
-        return projectRecords.Select(record => new JednaniUkolViewModel
-        {
-            ZaznamId = record.Id,
-            CisloZaznamu = record.CisloZaznamu,
-            CisloViditelne = ResolveVisibleRecordNumber(record),
-            Popis = record.Nazev,
-            Zapis = string.Empty,
-            LzeUpravovatVyjadreni = canModify,
-            SubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
-            Vyjadreni = (commentsByRecord.TryGetValue(record.Id, out var commentsForRecord)
-                    ? (IEnumerable<VyjadreniEntity>)commentsForRecord
-                    : Array.Empty<VyjadreniEntity>())
-                .Select(comment => new JednaniVyjadreniViewModel
-                {
-                    Id = comment.Id,
-                    AutorOsobaId = comment.AutorOsobaId,
-                    Autor = BuildInlinePersonLabelFromOsoba(people.GetValueOrDefault(comment.AutorOsobaId)),
-                    Datum = comment.DatumVyjadreni,
-                    Text = comment.TextVyjadreni,
-                    LzeUpravit = canModify,
-                    CanEditOwnAsSubsystemLeader = canModify && isDraftMeeting
-                })
-                .ToList()
-        }).ToList();
     }
 
     private async Task<List<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(
@@ -469,36 +324,6 @@ public sealed partial class MeetingService
             .ToList();
     }
 
-    private async Task<Dictionary<int, List<int>>> BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(int projectId, CancellationToken ct)
-    {
-        var leadRoleIds = (await dbContext.CiselnikRoliSubsystemu.AsNoTracking()
-            .Where(x => x.Kod == SubsystemRoleCodes.Lead || x.Kod == SubsystemRoleCodes.DeputyLead)
-            .Select(x => x.Id)
-            .ToListAsync(ct))
-            .ToHashSet();
-        if (leadRoleIds.Count == 0)
-        {
-            return [];
-        }
-
-        var activeProjectSubsystems = await dbContext.ProjektSubsystemy.AsNoTracking()
-            .Where(x => x.ProjektId == projectId && !x.DatumOdebrani.HasValue)
-            .ToListAsync(ct);
-        var subsystemIdByProjectSubsystemId = activeProjectSubsystems.ToDictionary(x => x.Id, x => x.SubsystemId);
-        var activeProjectSubsystemIds = subsystemIdByProjectSubsystemId.Keys.ToHashSet();
-        var rows = await dbContext.ObsazeniSubsystemuProjektu.AsNoTracking()
-            .Where(x => activeProjectSubsystemIds.Contains(x.ProjektSubsystemId)
-                && !x.DatumOdebrani.HasValue
-                && leadRoleIds.Contains(x.RoleSubsystemuId))
-            .ToListAsync(ct);
-
-        return rows
-            .GroupBy(x => subsystemIdByProjectSubsystemId[x.ProjektSubsystemId])
-            .ToDictionary(
-                group => group.Key,
-                group => group.Select(x => x.OsobaId).Distinct().OrderBy(x => x).ToList());
-    }
-
     private CiselnikStavuUcastiEntity? ResolveDefaultAttendanceState(IReadOnlyList<CiselnikStavuUcastiEntity> stateRows)
     {
         return stateRows.FirstOrDefault(x => Ci.Equals(x.Kod, "PRESENT"))
@@ -550,18 +375,6 @@ public sealed partial class MeetingService
         }
 
         return record.CisloZaznamu.ToString(CultureInfo.InvariantCulture);
-    }
-
-    private static IEnumerable<ProjektovyZaznamEntity> OrderRecordsByVisibleNumber(IEnumerable<ProjektovyZaznamEntity> rows)
-        => rows
-            .OrderBy(x => RecordDisplayOrdering.VisibleNumberPartA(x.CisloViditelneA, x.CisloZaznamu))
-            .ThenBy(x => RecordDisplayOrdering.VisibleNumberPartB(x.CisloViditelneTyp, x.CisloViditelneB))
-            .ThenBy(x => x.CisloZaznamu);
-
-    private static bool IsMeetingTaskVisible(string? stavKod)
-    {
-        return !Ci.Equals(stavKod, "END")
-            && !Ci.Equals(stavKod, "CANCELLED");
     }
 
     private static string BuildSubsystemRoleLabel(string roleName, string? subsystemCode, string? subsystemName)

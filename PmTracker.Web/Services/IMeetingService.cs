@@ -13,7 +13,6 @@ public interface IMeetingService
 
     Task<JednaniDetailViewModel> BuildJednaniDetailAsync(int id, CancellationToken ct = default);
     Task<int?> GetMeetingProjectIdAsync(int meetingId, CancellationToken ct = default);
-    Task<JednaniUkolViewModel?> GetSingleTaskAsync(int meetingId, int zaznamId, CancellationToken ct = default);
     Task<IReadOnlyList<MeetingParticipantCandidateViewModel>> BuildMeetingParticipantCandidatesAsync(int projectId, int meetingId, CancellationToken ct = default);
 
     Task<int> SaveMeetingAsync(SaveMeetingCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default);

@@ -186,7 +186,7 @@ Navíc prošlo:
 **Známá omezení (vědomě):**
 - Autor a datum nejsou vidět na první pohled, jen v bublině (zadání). Tisk a PDF je dál obsahují.
 - Ikony při najetí na chvíli zakryjí konec prvního řádku textu (hlavně na úzkém okně).
-- **Nesoulad UI × server u vlastních vyjádření (stav před touto změnou, nemění se):** Gestor a Metodik v přípravě vidí tužku, ale server úpravu odmítne („Nemáte oprávnění…“). Smazání projde. Gestor, Metodik a Vedoucí u svého vyjádření v otevřeném jednání tužku nevidí, i když by jim server úpravu povolil. Rozhodne se zvlášť.
+- ~~Nesoulad UI × server u vlastních vyjádření~~ — vyřešeno 2026-11-11, viz §10. (Průběžná poznámka „smazání projde“ u Gestora a Metodika v přípravě byla chybná: server smazání odmítal stejně jako úpravu — ověřeno testem před změnou.)
 - Stránka záznamu má na 375 px vodorovný posuvník kvůli tlačítkům v hlavičce stránky. Bylo to tak i dřív a s vyjádřeními to nesouvisí.
 
 ## 6. Záznam — hlavička vlevo, detaily v tabulce, procházení šipkami, mazání data plánu
@@ -365,7 +365,46 @@ Navíc:
 
 ---
 
-## 10. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
+## 10. Vyjádření — kdo smí přidat, upravit a smazat
+
+**Hotovo 2026-11-12:** merge `e755f268`. Spec `docs/superpowers/specs/2026-11-10-vyjadreni-uprava-podle-role-design.md`, pravidla v `docs/specs/record-comments.md`.
+
+**Co se mění pro uživatele:**
+
+| Role | Dřív | Nově |
+|---|---|---|
+| Gestor | vlastní v přípravě: tužka ano, uložení odmítnuto; v otevřeném jednání tužka chyběla | vlastní v přípravě i v otevřeném: tužka i koš, uložení projde |
+| Metodik | přidával v přípravě i otevřeném, u všech subsystémů | přidá, upraví, smaže jen v přípravě a jen u svého subsystému |
+| Vedoucí, Zástupce | vlastní v otevřeném: tužka chyběla, server by povolil | tužka chybí a server odmítne (pro uživatele beze změny) |
+| Admini, Vlastník, Admin projektu, PM, Host, Read-all | — | beze změny |
+
+- Ikony tužka / koš teď počítá server stejným pravidlem jako uložení — co se ukáže, projde; co se neukáže, server odmítne.
+- Starší vyjádření metodika u cizího subsystému nebo v otevřeném jednání zůstávají; upravit je může PM / admin.
+- Smazán nepoužívaný blok úkolu v detailu jednání (`_TaskItemPartial`), detail jednání tím ušetří jeden dotaz do DB. Vzhled se nemění.
+
+**Ověřeno lokálně:**
+- Automatické testy: Unit 2344, Api 545, Integration 204, JS 78 — vše zelené. E2E 118 testů: na větvi stejných 22 selhání podle jmen jako na `main` (`d91cde9`), nová žádná.
+- Před změnou test potvrdil, že server Gestorovi smazání vlastního vyjádření v přípravě odmítal (dřívější poznámka v §5 byla chybná).
+- **V prohlížeči za všech 13 rolí** (dočasné osoby, 26 vyjádření na záznamu 901-1 v přípravě / otevřeném / uzavřeném jednání a 1 u cizího subsystému 902-1; stránka záznamu i detail jednání v přípravě): ikony u každého vyjádření a nabídka jednání ve formuláři přesně podle tabulky výše — 681 kontrol, jediná odchylka je dev 500 u podvrhu hosta (níže).
+  - Kliknutím: Gestor upravil vlastní v otevřeném a smazal vlastní v přípravě; Metodik přidal a upravil vlastní v přípravě; Vedoucí smazal vlastní v přípravě; Zástupce upravil vlastní v přípravě; PM upravil cizí (hosta).
+  - Podvržené požadavky tam, kde ikony nejsou (Metodik v otevřeném a u cizího subsystému, Vedoucí a Zástupce v otevřeném, Gestor na cizím, PM v uzavřeném, Host): všechny odmítnuté, v DB beze změny. U hosta v dev běhu 500 „No DefaultForbidScheme“ (v produkci 403).
+  - Bez chyb v konzoli. Dev DB po úklidu shodná se zálohou (počty řádků všech tabulek).
+
+**Otestovat (asi 20 min; jednání v přípravě, otevřené a uzavřené):**
+- [ ] Gestor: vlastní vyjádření v přípravě i v otevřeném jednání — tužka i koš, úprava a smazání projdou; u cizího vyjádření ikony nejsou.
+- [ ] Metodik: na záznamu svého subsystému nabídka jednání jen „v přípravě“, přidání, úprava a smazání vlastního projdou; v otevřeném jednání a u záznamu jiného subsystému formulář ani ikony nejsou.
+- [ ] Vedoucí / zástupce: vlastní v přípravě ikony ano, v otevřeném ne.
+- [ ] PM nebo admin projektu: ikony u všech vyjádření kromě uzavřeného jednání.
+- [ ] Host: žádné ikony, žádný formulář.
+- [ ] Detail jednání → rozbalit záznam → vyjádření: totéž jako na stránce záznamu; po uložení se panel obnoví a předvybrané jednání zůstane.
+
+**Známá omezení (vědomě):**
+- Když se jednání přepne do jiného stavu v jiném okně, ikony se změní až po obnovení panelu (jako dřív).
+- Redesign klíčů oprávnění (`docs/known-issues/authz-ui-serverside-mismatch.md`) je mimo rozsah.
+
+---
+
+## 11. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
 
 **Hotovo 2026-11-11:** merge `MERGE_HASH`, spec `docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`, plán `docs/superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md`.
 
@@ -406,4 +445,3 @@ Navíc:
 - Dlaždice „Úkoly po termínu“ = zpožděný **krok harmonogramu**; KPI Statistik „po termínu ukončení“ = termín úkolu před dneškem. Úkol bez plánu harmonogramu se v dlaždici neobjeví, v KPI ano.
 - KPI „Otevřené úkoly“ u historického období počítá jen úkoly založené do konce období.
 - Rozpočet IS se ukáže jen s vyplněným limitem v `HOT_IS`.
-

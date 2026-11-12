@@ -991,7 +991,7 @@ mark.app-search-flash.app-search-flash--fading {
 }
 
 /* Action chip pro diagnostické tlačítka v error error logu (Obnovit stránku,
-   Kopírovat log). Gov tokens, dark mode safe — sjednoceno s .comment-action-chip. */
+   Kopírovat log). Gov tokens, dark mode safe. */
 .modal-submit-action-btn {
     display: inline-flex;
     align-items: center;
@@ -1750,44 +1750,8 @@ mark.app-search-flash.app-search-flash--fading {
     font-style: italic;
 }
 
-/* .btn / .btn.primary / .btn.ghost / .btn.danger / .btn.small / .btn:hover /
-   .btn:disabled — legacy button styly odstraněny 2026-04-29. Všechna použití
-   nahrazena za pm-button (= gov-button), kromě <summary class="comment-action-chip">
-   v _TaskItemPartial.cshtml — ten má vlastní pravidlo níže. */
-
-.comment-action-chip {
-    border: 1px solid var(--border-subtle);
-    background: transparent;
-    color: var(--text-primary-color);
-    text-decoration: none;
-    padding: 7px 12px;
-    border-radius: var(--gov-radius-sm);
-    font-weight: 500;
-    font-size: 13px;
-    line-height: 1.2;
-    min-height: 34px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
-    list-style: none;
-}
-
-.comment-action-chip::-webkit-details-marker { display: none; }
-.comment-action-chip::marker { content: ""; }
-
-.comment-action-chip:hover {
-    border-color: var(--border-primary);
-    background: var(--background-neutral-subtle);
-}
-
-.comment-action-chip:focus-visible {
-    outline: 2px solid var(--border-primary);
-    outline-offset: 1px;
-}
+/* .btn — legacy button styly odstraněny 2026-04-29 (pm-button = gov-button). Jediná výjimka
+   .comment-action-chip patřila _TaskItemPartial, smazanému 2026-11-11 (spec vyjádření R8). */
 
 .icon-btn {
     width: 34px;
@@ -1930,7 +1894,7 @@ textarea:not(gov-form-input textarea):not(pm-textarea textarea) {
     max-height: 240px;
     overflow-y: auto;
     /* Explicit reset — editor nesmí dědít bold/heading font-weight z parent
-       containeru (např. .form-group label, .comment-header). Bold stále
+       containeru (např. .form-group label). Bold stále
        dostupný přes toolbar tlačítko Bold (uloží se jako <strong>). */
     font-weight: 400;
     font-family: inherit;
@@ -4163,7 +4127,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
    Blok = jeden rámeček; řádky bez vlastního rámečku, odliší je jen jemně šedé
    podbarvení pod myší / při fokusu. Vpravo float se štítkem jednání (autor a datum
    v bublině .chip-tooltip--end), Upravit / Smazat jako ikony řádku při najetí.
-   Jen pod .record-comments — _TaskItemPartial (Jednani) sdílí .comment / .comment-list.
+   Jen pod .record-comments — základní .comment / .comment-list zůstávají obecné.
    overflow: visible ruší overflow: hidden základního .comment, jinak by řádek ořízl
    bublinu i ikony; float obsáhne display: flow-root. */
 .record-comments .comment-list {
@@ -4871,22 +4835,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
 .task-list {
     display: grid;
     gap: 12px;
-}
-
-.task-item {
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 12px;
-    background: var(--background-neutral-subtlest);
-}
-
-.task-item textarea {
-    min-height: 120px;
-}
-
-.task-title {
-    font-weight: 600;
-    margin-bottom: 6px;
 }
 
 .search-results {
@@ -5776,14 +5724,6 @@ gov-dialog[data-modal-container][data-modal-overflow-visible="true"] .office-sea
     border: 1px solid var(--border-subtle);
     border-radius: var(--gov-radius);
     background: var(--background-block-primary);
-}
-
-.meeting-note-input {
-    min-height: 132px;
-}
-
-.meeting-note-add-form {
-    margin-top: 10px;
 }
 
 .meeting-notes-actions {
