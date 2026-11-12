@@ -25,6 +25,7 @@ public static class ServiceDeskServiceCollectionExtensions
             services.AddScoped<ITicketingQueryService, DisabledTicketingQueryService>();
             services.AddScoped<IVyjadreniQueryService, DisabledVyjadreniQueryService>();
             services.AddScoped<IInformacniSystemQueryService, DisabledInformacniSystemQueryService>();
+            services.AddScoped<IProdleniQueryService, DisabledProdleniQueryService>();
             return services;
         }
 
@@ -55,6 +56,31 @@ public static class ServiceDeskServiceCollectionExtensions
         services.AddScoped<IVyjadreniQueryService, SqlVyjadreniQueryService>();
         services.AddScoped<IInformacniSystemQueryService, SqlInformacniSystemQueryService>();
 
+        AddServiceDeskExternal(services, configuration, options);
+
         return services;
+    }
+
+    /// <summary>
+    /// Databáze starého ServiceDesku pro výpočet prodlení (spec 2026-10-15 §6.2). Na rozdíl od intranetNEW
+    /// prázdný connection string aplikaci neshodí: prodlení se jen nepočítá a záložka NES ukáže placeholder.
+    /// </summary>
+    private static void AddServiceDeskExternal(IServiceCollection services, IConfiguration configuration, TicketingOptions options)
+    {
+        var connectionString = configuration.GetConnectionString(options.ExternalConnectionStringName);
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            services.AddScoped<IProdleniQueryService, DisabledProdleniQueryService>();
+            return;
+        }
+
+        services.AddDbContext<ServiceDeskExternalReadOnlyDbContext>(opts =>
+            opts.UseSqlServer(connectionString, sql =>
+            {
+                sql.CommandTimeout(options.CommandTimeoutSeconds);
+                // Stejný důvod jako u intranetNEW: starší SQL Server bez OPENJSON → Contains() jako klasické IN.
+                sql.UseCompatibilityLevel(120);
+            }));
+        services.AddScoped<IProdleniQueryService, SqlProdleniQueryService>();
     }
 }

@@ -1,0 +1,82 @@
+@model PmTracker.Web.Services.ProjectDashboard.ProdleniTimelineViewModel
+@using System.Globalization
+@*
+    Časová osa obrátek ticketu (spec 2026-10-15 §10). Polohy v % počítá server (ProdleniTimelineBuilder),
+    SVG je jen vykreslí: obrátka = úsečka, penalizované dny = pruh pod ní, termín = svislá čárka,
+    prodloužený termín = kosočtverec, dnešek = čárkovaná svislice. Význam značek nese legenda pod osou.
+*@
+@{
+    var cs = CultureInfo.GetCultureInfo("cs-CZ");
+    string Pct(double p) => p.ToString("0.##", CultureInfo.InvariantCulture) + "%";
+    string Cas(DateTime d) => d.ToString("dd.MM.yyyy HH:mm", cs);
+    string Den(DateTime d) => d.ToString("dd.MM.yyyy", cs);
+    var dnesVpravo = Model.DnesPct > 80;
+}
+<div class="pd-tl" data-prodleni-timeline>
+    <svg class="pd-tl__svg" width="100%" height="64" role="img"
+         aria-label="Časová osa obrátek od @Den(Model.OsaOd) do @Den(Model.OsaDo)">
+        <line class="pd-tl__axis" x1="0" x2="100%" y1="50" y2="50"></line>
+
+        @foreach (var beh in Model.Penale)
+        {
+            <rect class="pd-tl__penale" data-timeline-penale x="@Pct(beh.OdPct)" y="32" height="6"
+                  width="@Pct(beh.DoPct - beh.OdPct)" rx="2">
+                <title>Penalizované dny @Den(beh.Od) – @Den(beh.Do.AddDays(-1))</title>
+            </rect>
+        }
+
+        @foreach (var o in Model.Obratky)
+        {
+            <line class="pd-tl__obratka@(o.Otevrena ? " pd-tl__obratka--open" : "")@(o.JinyDodavatel ? " pd-tl__obratka--other" : "")"
+                  data-timeline-obratka x1="@Pct(o.OdPct)" x2="@Pct(o.DoPct)" y1="22" y2="22">
+                <title>@(o.Dodavatel ?? "Dodavatel"): předáno @Cas(o.Od), @(o.Do is { } konec ? $"převzato {Cas(konec)}" : "dosud u dodavatele")</title>
+            </line>
+        }
+
+        @if (Model.Termin is { } termin)
+        {
+            <line class="pd-tl__termin" data-timeline-termin x1="@Pct(termin.Pct)" x2="@Pct(termin.Pct)" y1="10" y2="40">
+                <title>Termín @Cas(termin.Datum)</title>
+            </line>
+        }
+
+        @foreach (var p in Model.Prodlouzeni)
+        {
+            <svg class="pd-tl__marker" data-timeline-prodlouzeni x="@Pct(p.Pct)" y="22">
+                <path class="pd-tl__prodlouzeni" d="M0 -7 L7 0 L0 7 L-7 0 Z">
+                    <title>Termín prodloužen do @Cas(p.Datum)</title>
+                </path>
+            </svg>
+        }
+
+        <line class="pd-tl__dnes" data-timeline-dnes x1="@Pct(Model.DnesPct)" x2="@Pct(Model.DnesPct)" y1="4" y2="50">
+            <title>Dnes @Cas(Model.Dnes)</title>
+        </line>
+        <text class="pd-tl__dnes-label" x="@Pct(Model.DnesPct)" y="62" dx="@(dnesVpravo ? "-4" : "4")"
+              text-anchor="@(dnesVpravo ? "end" : "start")">dnes</text>
+    </svg>
+    <div class="pd-tl__range" aria-hidden="true">
+        <span>@Den(Model.OsaOd)</span>
+        <span>@Den(Model.OsaDo)</span>
+    </div>
+    <div class="pd-tl__legend" aria-label="Legenda časové osy">
+        <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--obratka"></span>u dodavatele</span>
+        @if (Model.Obratky.Any(o => o.JinyDodavatel))
+        {
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--other"></span>u jiného dodavatele</span>
+        }
+        @if (Model.Penale.Count > 0)
+        {
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--penale"></span>penalizované dny</span>
+        }
+        @if (Model.Termin is not null)
+        {
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--termin"></span>termín</span>
+        }
+        @if (Model.Prodlouzeni.Count > 0)
+        {
+            <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--prodlouzeni"></span>prodloužený termín</span>
+        }
+        <span class="pd-tl__item"><span class="pd-tl__key pd-tl__key--dnes"></span>dnes</span>
+    </div>
+</div>

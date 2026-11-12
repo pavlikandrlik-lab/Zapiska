@@ -1,0 +1,13 @@
+@model string
+@*
+    Chybová karta panelu dashboardu (spec 2026-10-15 §13) — např. když databáze ServiceDesku neodpovídá.
+    Tlačítko znovu načte panel (data-dashboard-panel-retry obsluhuje dashboard.js).
+*@
+<div class="pd-state pd-state--error" role="alert">
+    <gov-icon size="m" name="exclamation-triangle-fill" type="components" aria-hidden="true"></gov-icon>
+    <div class="pd-state__body">
+        <p class="pd-state__title">@Model</p>
+        <p class="pd-state__text">Zkuste to za chvíli. Když potíž trvá, dejte vědět správci aplikace.</p>
+    </div>
+    <button type="button" class="pd-state__action" data-dashboard-panel-retry>Zkusit znovu</button>
+</div>

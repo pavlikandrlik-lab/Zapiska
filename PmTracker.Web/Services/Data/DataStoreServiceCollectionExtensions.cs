@@ -127,6 +127,14 @@ public static class DataStoreServiceCollectionExtensions
         // Plán C/D follow-up: manuální drag-and-drop rebalance přes ChronologyRebalancer.
         // Volaný z VyjadreniModalController.CreateVazba.
         services.AddScoped<IBindingRebalanceService, BindingRebalanceService>();
+        // 2026-11-11: prodlení ticketů podle penalizačního algoritmu starého ServiceDesku
+        // (spec 2026-10-15). Kalendář svátků je bezstavový s cache po rocích.
+        services.AddSingleton<PmTracker.Web.Services.ServiceDesk.Prodleni.ICeskeSvatky,
+            PmTracker.Web.Services.ServiceDesk.Prodleni.CeskeSvatky>();
+        services.AddSingleton<PmTracker.Web.Services.ServiceDesk.Prodleni.PenaltyCalculator>();
+        // Scoped (PmTrackerDbContext + IProdleniQueryService z AddServiceDeskIntegration); výsledky drží IMemoryCache.
+        services.AddScoped<PmTracker.Web.Services.ServiceDesk.Prodleni.IProdleniService,
+            PmTracker.Web.Services.ServiceDesk.Prodleni.ProdleniService>();
         // Plán 3 Feature D (2026-04-24, U10): hard constraint validator pro vytvoření
         // nové externí vazby. Volaný ze RecordService.SaveRecordAsync přes
         // ValidateExternalLinksAsync — PŘED SaveChangesAsync.
@@ -166,28 +174,12 @@ public static class DataStoreServiceCollectionExtensions
         services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvyPanelBuilder>(sp => sp.GetRequiredService<PmTracker.Web.Services.Vyzvy.VyzvyPanelBuilder>());
         services.AddScoped<PmTracker.Web.Services.Vyzvy.IVyzvaExportBuilder, PmTracker.Web.Services.Vyzvy.VyzvaExportBuilder>();
         services.AddScoped<IProjectDashboardService, ProjectDashboardService>();
-        // Základní report — rámec grafů. Chart-providery (konkrétní grafy) se registrují níže.
+        services.AddScoped<DashboardSouhrnService>();
+        // Report Statistik — rámec grafů; konkrétní grafy registruje AddZakladniReportProviders.
         services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniDatasetLoader,
             PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniDatasetLoader>();
         services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportBuilder>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordsPerSubsystemProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordStatusPieProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.RecordStatusBreakdownProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.VyjadreniStatsProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.VyjadreniPerSubsystemProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineDisciplineStatsProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineCompliancePerSubsystemProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineOriginalCompliancePerSubsystemProvider>();
-        services.AddScoped<PmTracker.Web.Services.ProjectDashboard.Zakladni.IZakladniChartProvider,
-            PmTracker.Web.Services.ProjectDashboard.Zakladni.Providers.DeadlineAvgShiftDaysPerSubsystemProvider>();
+        PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportServiceCollectionExtensions.AddZakladniReportProviders(services);
         services.AddScoped<IHomeDashboardService>(sp => sp.GetRequiredService<HomeDashboardService>());
         services.AddScoped<IPeopleService>(sp => sp.GetRequiredService<PeopleService>());
         services.AddScoped<IProfileService>(sp => sp.GetRequiredService<ProfileService>());

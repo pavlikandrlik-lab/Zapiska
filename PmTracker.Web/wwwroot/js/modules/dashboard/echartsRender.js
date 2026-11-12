@@ -1,65 +1,133 @@
-// dashboard/echartsRender.js — vykreslí ChartData kontejnery základního reportu přes
-// Apache ECharts (SVG renderer = vektor pro tisk/PDF). Knihovna je self-hostovaná offline
-// (wwwroot/lib/echarts), žádné CDN. Server posílá ChartData v data-chart-json (camelCase,
-// kind jako string) — viz ChartJson.cs / _Chart.cshtml.
+// dashboard/echartsRender.js — vykreslí ChartData kontejnery ([data-echart]) přes Apache ECharts
+// (SVG renderer = vektor pro tisk/PDF). Knihovna je self-hostovaná offline (wwwroot/lib/echarts),
+// žádné CDN. Server posílá ChartData v data-chart-json (camelCase, kind jako string) — viz
+// ChartJson.cs / _Chart.cshtml. Mapování na option je v echartsOption.js, barvy v echartsTheme.js.
 import * as echarts from "../../../lib/echarts/echarts.esm.min.js";
+import { optionFor, vyskaGrafu } from "./echartsOption.js";
+import { readTheme } from "./echartsTheme.js";
 
-function optionFor(d) {
-    const cats = d.categories || [];
-    const series = d.series || [];
-    switch (d.kind) {
-        case "Bar":
-            return {
-                tooltip: {}, xAxis: { type: "category", data: cats }, yAxis: { type: "value" },
-                series: series.map(s => ({ name: s.label, type: "bar", data: s.values }))
-            };
-        case "StackedBar":
-            return {
-                tooltip: {}, legend: {}, xAxis: { type: "category", data: cats }, yAxis: { type: "value" },
-                series: series.map(s => ({ name: s.label, type: "bar", stack: "total", data: s.values }))
-            };
-        case "Line":
-            return {
-                tooltip: {}, xAxis: { type: "category", data: cats }, yAxis: { type: "value" },
-                series: series.map(s => ({ name: s.label, type: "line", data: s.values }))
-            };
-        case "Pie": {
-            const s0 = series[0] || { values: [] };
-            return {
-                tooltip: { trigger: "item" }, legend: {},
-                series: [{ type: "pie", radius: "65%", data: cats.map((c, i) => ({ name: c, value: s0.values[i] ?? 0 })) }]
-            };
-        }
-        default:
-            return null;
+// Sledované kontejnery. Po výměně HTML panelu (změna období) staré zmizí z DOM — uklízí je sweep().
+const sledovane = new Set();
+
+function parse(el) {
+    try {
+        return JSON.parse(el.dataset.chartJson || "{}");
+    }
+    catch {
+        return null;
     }
 }
 
-function renderOne(el) {
-    if (el.dataset.echartReady === "true") return;
-    let data;
-    try { data = JSON.parse(el.dataset.chartJson || "{}"); } catch { return; }
-    const option = optionFor(data);
-    if (!option) return;
-    // Lazy/skrytý panel (display:none nebo neaktivní tab) → kontejner má nulovou šířku.
-    // ECharts by se vykreslil do 0×0; počkáme na další frame, až panel dostane rozměr.
-    if (el.clientWidth === 0) { window.requestAnimationFrame(() => renderOne(el)); return; }
+function dispose(el) {
+    if (el._echart) {
+        el._echart.dispose();
+        el._echart = null;
+    }
+    delete el.dataset.echartReady;
+}
+
+function render(el) {
+    // Skrytý panel (neaktivní záložka) má nulovou šířku — ECharts by kreslil do 0×0.
+    // Vykreslí se, až ResizeObserver ohlásí skutečný rozměr.
+    if (el.dataset.echartReady === "true" || el.clientWidth === 0) {
+        return;
+    }
+    const data = parse(el);
+    const option = data ? optionFor(data, readTheme()) : null;
+    if (!option) {
+        return;
+    }
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        option.animation = false;
+    }
+    el.style.height = `${vyskaGrafu(data)}px`;
     const chart = echarts.init(el, null, { renderer: "svg" });
     chart.setOption(option);
-    el.dataset.echartReady = "true";
     el._echart = chart;
+    el.dataset.echartReady = "true";
+}
+
+const pozorovatel = typeof ResizeObserver === "function"
+    ? new ResizeObserver((entries) => {
+        for (const entry of entries) {
+            const el = entry.target;
+            if (el.dataset.echartReady === "true") {
+                if (el._echart && el.clientWidth > 0) {
+                    el._echart.resize();
+                }
+            }
+            else {
+                render(el);
+            }
+        }
+    })
+    : null;
+
+function sweep() {
+    for (const el of sledovane) {
+        if (!el.isConnected) {
+            if (pozorovatel) {
+                pozorovatel.unobserve(el);
+            }
+            dispose(el);
+            sledovane.delete(el);
+        }
+    }
+}
+
+function sleduj(el) {
+    if (!(el instanceof HTMLElement) || sledovane.has(el)) {
+        return;
+    }
+    sledovane.add(el);
+    if (pozorovatel) {
+        pozorovatel.observe(el);
+    }
+    render(el);
 }
 
 export function initEchartsReport(scope) {
+    sweep();
     const root = scope instanceof Element ? scope : document;
-    root.querySelectorAll("[data-echart]").forEach(renderOne);
+    root.querySelectorAll("[data-echart]").forEach(sleduj);
 }
 
-let resizeBound = false;
-export function bindEchartsResize() {
-    if (resizeBound) return;
-    resizeBound = true;
+function prekresliVse() {
+    for (const el of sledovane) {
+        if (el.isConnected && el.dataset.echartReady === "true") {
+            dispose(el);
+            render(el);
+        }
+    }
+}
+
+let lifecycleBound = false;
+
+/** Jednorázově: změna velikosti okna, přepnutí motivu (data-theme) a načtení lazy panelu. */
+export function bindEchartsLifecycle() {
+    if (lifecycleBound) {
+        return;
+    }
+    lifecycleBound = true;
+
+    // Záloha pro prohlížeč bez ResizeObserver.
     window.addEventListener("resize", () => {
-        document.querySelectorAll("[data-echart]").forEach(el => el._echart && el._echart.resize());
+        for (const el of sledovane) {
+            if (el._echart) {
+                el._echart.resize();
+            }
+            else {
+                render(el);
+            }
+        }
+    });
+
+    // Barvy grafů jsou vyřešené hodnoty tokenů — po přepnutí motivu se musí přečíst znovu.
+    new MutationObserver(prekresliVse)
+        .observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+    // Lazy panel (záložka dashboardu, změna období) přinese nové kontejnery.
+    document.addEventListener("pm:panel-loaded", (event) => {
+        initEchartsReport(event.target instanceof Element ? event.target : document);
     });
 }

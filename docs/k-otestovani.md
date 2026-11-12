@@ -401,3 +401,47 @@ Navíc:
 **Známá omezení (vědomě):**
 - Když se jednání přepne do jiného stavu v jiném okně, ikony se změní až po obnovení panelu (jako dřív).
 - Redesign klíčů oprávnění (`docs/known-issues/authz-ui-serverside-mismatch.md`) je mimo rozsah.
+
+---
+
+## 11. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
+
+**Hotovo 2026-11-11:** merge `MERGE_HASH`, spec `docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`, plán `docs/superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md`.
+
+**Nasazení — nový connection string (bez změny schématu PM Trackeru):**
+- `ConnectionStrings:ServiceDeskExternalReadOnly` = databáze starého ServiceDesku (z jeho `Web.config`, `ServiceDeskEntities`), `Ticketing:ExternalConnectionStringName = ServiceDeskExternalReadOnly`, `Ticketing:Enabled = true`. Návod v `install.md` §7.
+- Login aplikačního poolu: `SELECT` na `ticket_external`, `ticket_external_workflow`, `ticket_external_sla`.
+- Bez connection stringu aplikace běží, záložka NES jen ukáže, že napojení není zapnuté.
+
+**Co to dělá:**
+- **Nový vzhled dashboardu:** hlavička s chipem IS, souhrnný pás čtyř dlaždic (Úkoly po termínu, Čeká na skutečnost, Tickety v prodlení, Hrozí prodlení), systémové záložky, které si pamatují poslední volbu. Klik na dlaždici přepne záložku a nastaví filtr.
+- **Záznamy:** chipy s počty, tabulka v kartě se stavovým pruhem, rozbalení klikem i Enterem, odkazy Otevřít záznam / Harmonogram, prázdný stav s fajfkou.
+- **NES v prodlení** se počítá **stejně jako starý ServiceDesk** (port `TicketPenaltyCalculator`) z předávek U1–U11: NES SLA hodiny podle důležitosti → pracovní dny, PMP kalendářní dny, PNF pracovní dny, prodloužení U11, víc dodavatelů (T00). V seznamu jen tickety **právě u dodavatele**. KPI, dva grafy, filtr NES/PMP/PNF, časová osa obrátek a odůvodnění v rozbaleném řádku, sekce Hrozí prodlení a Nelze vyhodnotit.
+- **Excel NES:** sloupce Důležitost, U dodavatele od, Termín, Prodlouženo do, Penalizované dny (číslo), Typ dní, Odůvodnění; odůvodnění a data penalizovaných dnů i v komentářích buněk; druhý list Nelze vyhodnotit.
+- **Statistiky = nový report** (legacy panel smazán): výběr roku a kvartálu, srovnání s předchozím obdobím, sekce Přehled / Průběh práce / Termíny / Lidé a spolupráce / ServiceDesk a dodavatelé. U každého grafu „Zobrazit data“.
+- **Vědomá změna čísel:** úkolové grafy počítají jen kategorii Úkol (Informace a Rozhodnutí dřív padaly do „Nezahájeno“).
+- **Oprava, která se ukázala až proti SQL Serveru:** stará záložka NES na ostrém serveru nikdy nic neukázala. Dotaz porovnával číslo ticketu s prázdným textem a to se přeložilo na `[id] <> NULL`. Nový dotaz to nemá a hlídá ho test vygenerovaného SQL.
+
+**Ověřeno lokálně:**
+- Unit 2522, Api 559, JS 108, Integration (loader) zelené.
+- Prohlížeč (Playwright, skutečné kliky) proti lokální SQL replice ServiceDesku (`scripts/dev/servicedesk_external_schema.sql`, `scripts/dev/intranetnew_prodleni_seed.sql`): **11 rolí** + osoba bez přístupu; světlý i tmavý motiv, 1440 a 390 px bez horizontálního posuvu; dlaždice → záložka, rozbalení řádků myší i Enterem, filtry, sekce Hrozí/Nelze, stažení Excelu, Statistiky rok → Q3 → zpět, přepnutí motivu s otevřenými grafy, projekt bez IS. 0 chyb v konzoli a HTTP.
+
+**Otestovat (PM nebo admin projektu, ne superadmin; i15 / Edge):**
+- [ ] Projekt **s IS**: dlaždice „Tickety v prodlení“ ukazuje počet a součet dní; klik otevře NES v prodlení.
+- [ ] NES: počty dní u 5–10 ticketů porovnat se sloupcem „Dní penále“ ve starém ServiceDesku (parita, viz níže).
+- [ ] NES: rozbalit řádek → časová osa a odůvodnění dávají smysl (předání, termín, prodloužení, dnes).
+- [ ] NES: ticket vrácený zpět k nám v seznamu není; ticket u dvou dodavatelů má hvězdičku.
+- [ ] NES: Export do Excelu → otevřít ve skutečném Excelu: komentáře u Odůvodnění a Penalizovaných dnů, Excel nehlásí opravu sešitu, sloupec dnů jde sečíst.
+- [ ] Sekce „Nelze vyhodnotit“: pokud se objeví důležitost bez SLA, doplnit řádek do `ticket_external_sla` ve ServiceDesku.
+- [ ] Projekt **bez IS**: ticketové dlaždice nejsou, NES ukáže odkaz na nastavení, Statistiky mají v sekci ServiceDesk jednu kartu s odkazem.
+- [ ] Statistiky: rok, kvartál, „Srovnání s:“, „Zobrazit data“ u grafu; čísla KPI odpovídají projektu.
+- [ ] Tmavý motiv: všechny tři záložky čitelné, grafy se po přepnutí přebarví.
+- [ ] Tisk (Ctrl+P) z otevřené záložky: tiskne se jen ona, karty se netrhají.
+
+**Parita se ServiceDeskem (čeká na tebe):** vyexportuj ze starého ServiceDesku sestavu „Dní penále“ pro 20–30 ticketů. Porovnám ji lokálně ticket × dodavatel × dny s výstupem PM Trackeru. Reálná data do gitu nejdou. Každý rozdíl je chyba portu. Jediná záměrná odchylka: důležitost bez řádku SLA = „Nelze vyhodnotit“ (originál by penalizoval od prvního dne).
+
+**Otevřené / vědomě:**
+- Prahy „Hrozí prodlení“ (NES ≤ 48 h, PMP/PNF ≤ 5 dní) jsou převzaté ze ServiceDesku, **nepotvrzené**.
+- Dlaždice „Úkoly po termínu“ = zpožděný **krok harmonogramu**; KPI Statistik „po termínu ukončení“ = termín úkolu před dneškem. Úkol bez plánu harmonogramu se v dlaždici neobjeví, v KPI ano.
+- KPI „Otevřené úkoly“ u historického období počítá jen úkoly založené do konce období.
+- Rozpočet IS se ukáže jen s vyplněným limitem v `HOT_IS`.

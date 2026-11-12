@@ -90,7 +90,8 @@ public static class ColorPaletteAudit
         break;
       }
     }
-    if (ownText && !el.matches(":disabled, [aria-disabled='true'], .is-disabled")) {
+    // WCAG 1.4.3: neaktivní ovládací prvek je z kontrastu vyjmutý i s obsahem (např. počet v zakázaném chipu).
+    if (ownText && !el.closest(":disabled, [aria-disabled='true'], .is-disabled")) {
       const fg = parse(cs.color), bg = effectiveBg(el);
       if (!fg) continue;
       const fgc = fg.a < 1 ? blend(fg, bg) : fg;

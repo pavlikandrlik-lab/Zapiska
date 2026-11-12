@@ -6,12 +6,10 @@ public interface IProjectDashboardService
 {
     Task<ProjectDashboardPageViewModel> BuildDashboardPageAsync(int projectId, CancellationToken ct = default);
     Task<ProjectDashboardRecordsPanelViewModel> BuildRecordsPanelAsync(int projectId, DateTime referenceDate, CancellationToken ct = default);
-    Task<ProjectDashboardStatisticsPanelViewModel> BuildStatisticsPanelAsync(int projectId, int year, CancellationToken ct = default);
 
     /// <summary>
-    /// Panel "NES v prodlení" — pokud je projekt napojen na IS (<c>projekty.servicedesk_info_system_id</c>),
-    /// dodá seznam ticketů v prodlení přes <see cref="PmTracker.ServiceDesk.Contracts.IInformacniSystemQueryService"/>.
-    /// Plán 5 Sprint B Task 4.
+    /// Záložka „NES v prodlení" nad penalizačním algoritmem (<see cref="ServiceDesk.Prodleni.IProdleniService"/>).
+    /// Statistiky skládá <see cref="Zakladni.ZakladniReportBuilder"/>.
     /// </summary>
     Task<ProjectDashboardNesPanelViewModel> BuildNesPanelAsync(int projektId, DateTime reference, CancellationToken ct = default);
 

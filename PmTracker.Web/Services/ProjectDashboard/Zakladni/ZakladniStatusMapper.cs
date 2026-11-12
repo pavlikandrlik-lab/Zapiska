@@ -46,6 +46,18 @@ public static class ZakladniStatusMapper
             : StatusBucket.Rozpracovano;
     }
 
+    /// <summary>
+    /// Barva kýble v grafu (název CSS tokenu): Hotovo = stavová zelená, Rozpracováno = modrá,
+    /// Nezahájeno = šedá, Zrušeno = tmavá šedá. Validováno skriptem palety (spec §12).
+    /// </summary>
+    public static string ColorToken(StatusBucket bucket) => bucket switch
+    {
+        StatusBucket.Hotovo => "--background-status-success",
+        StatusBucket.Rozpracovano => "--app-chart-1",
+        StatusBucket.Zruseno => "--app-chart-neutral-strong",
+        _ => "--app-chart-neutral",
+    };
+
     /// <summary>Lidský popisek kýble (osy/legendy/koláč).</summary>
     public static string Label(StatusBucket bucket) => bucket switch
     {

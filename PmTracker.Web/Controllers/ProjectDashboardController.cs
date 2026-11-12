@@ -7,6 +7,7 @@ using PmTracker.Web.Services.Export;
 using PmTracker.Web.Services.ProjectDashboard;
 using PmTracker.Web.Services.ProjectDashboard.Zakladni;
 using PmTracker.Web.Services.Security;
+using PmTracker.Web.Services.ServiceDesk.Prodleni;
 
 namespace PmTracker.Web.Controllers;
 
@@ -20,6 +21,7 @@ public sealed class ProjectDashboardController : BaseController
     private readonly IProjectDashboardService _dashboardService;
     private readonly INesPanelExcelExportService _nesExcelExport;
     private readonly ZakladniReportBuilder _reportBuilder;
+    private readonly DashboardSouhrnService _souhrnService;
     private readonly TimeProvider _timeProvider;
 
     public ProjectDashboardController(
@@ -28,12 +30,14 @@ public sealed class ProjectDashboardController : BaseController
         ILoggerFactory loggerFactory,
         IProjectDashboardService dashboardService,
         INesPanelExcelExportService nesExcelExport,
-        ZakladniReportBuilder reportBuilder)
+        ZakladniReportBuilder reportBuilder,
+        DashboardSouhrnService souhrnService)
         : base(userContextResolver, timeProvider, loggerFactory)
     {
         _dashboardService = dashboardService;
         _nesExcelExport = nesExcelExport;
         _reportBuilder = reportBuilder;
+        _souhrnService = souhrnService;
         _timeProvider = timeProvider;
     }
 
@@ -57,6 +61,23 @@ public sealed class ProjectDashboardController : BaseController
         return View(model);
     }
 
+    /// <summary>
+    /// Souhrnný pás (spec 2026-10-15 §8): dlaždice podle oprávnění k záložkám, lazy-load po načtení stránky.
+    /// </summary>
+    [HttpGet("souhrn")]
+    [Authorize(Policy = "permission:dashboard.view")]
+    public async Task<IActionResult> Souhrn(int projektId, CancellationToken ct = default)
+    {
+        if (!await EnsureDashboardAccessAsync(projektId, ct))
+        {
+            return Forbid();
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
+        var model = await _souhrnService.BuildAsync(projektId, CurrentUserContext, localNow, ct);
+        return PartialView("~/Views/ProjectDashboard/_Souhrn.cshtml", model);
+    }
+
     [HttpGet("records-panel")]
     [Authorize(Policy = "permission:dashboard.records.view")]
     public async Task<IActionResult> RecordsPanel(int projektId, CancellationToken ct = default)
@@ -71,9 +92,15 @@ public sealed class ProjectDashboardController : BaseController
         return PartialView("~/Views/ProjectDashboard/_RecordsPanel.cshtml", model);
     }
 
+    /// <summary>
+    /// Záložka Statistiky (spec 2026-10-15 §11): report za období — rok, kvartál (s rokem) nebo rozsah od–do.
+    /// Bez parametrů aktuální rok.
+    /// </summary>
     [HttpGet("statistics-panel")]
     [Authorize(Policy = "permission:dashboard.statistics.view")]
-    public async Task<IActionResult> StatisticsPanel(int projektId, int? year = null, CancellationToken ct = default)
+    public async Task<IActionResult> StatisticsPanel(
+        int projektId, int? rok = null, int? kvartal = null,
+        DateTime? od = null, DateTime? doDate = null, CancellationToken ct = default)
     {
         if (!await EnsureDashboardAccessAsync(projektId, ct))
         {
@@ -81,8 +108,30 @@ public sealed class ProjectDashboardController : BaseController
         }
 
         var currentYear = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).Year;
-        var model = await _dashboardService.BuildStatisticsPanelAsync(projektId, year ?? currentYear, ct);
-        return PartialView("~/Views/ProjectDashboard/_StatisticsPanel.cshtml", model);
+        Obdobi obdobi;
+        if (od.HasValue || doDate.HasValue)
+        {
+            if (od is not { } zacatek || doDate is not { } konec || konec < zacatek)
+            {
+                return BadRequest(new { error = "Rozsah období potřebuje začátek i konec a konec nesmí být před začátkem." });
+            }
+            obdobi = Obdobi.Rozsah(zacatek, konec);
+        }
+        else if (kvartal.HasValue)
+        {
+            if (kvartal is < 1 or > 4)
+            {
+                return BadRequest(new { error = "Kvartál musí být 1 až 4." });
+            }
+            obdobi = Obdobi.Kvartal(rok ?? currentYear, kvartal.Value);
+        }
+        else
+        {
+            obdobi = Obdobi.Rok(rok ?? currentYear);
+        }
+
+        var model = await _reportBuilder.BuildAsync(projektId, obdobi, ct);
+        return PartialView("~/Views/ProjectDashboard/Zakladni/Report.cshtml", model);
     }
 
     [HttpGet("nes-panel")]
@@ -114,9 +163,14 @@ public sealed class ProjectDashboardController : BaseController
 
         var localNow = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).DateTime;
         var model = await _dashboardService.BuildNesPanelAsync(projektId, localNow, ct);
-        if (!model.IsServiceDeskIntegrated)
+        switch (model.Prehled.Stav)
         {
-            return NotFound(new { error = "Projekt nemá napojení na ServiceDesk, export není k dispozici." });
+            case ProdleniStavDat.BezNapojeni:
+                return NotFound(new { error = "Projekt nemá napojení na ServiceDesk, export není k dispozici." });
+            case ProdleniStavDat.Nedostupne:
+                // Prázdný sešit by vypadal jako „nic není v prodlení" — při výpadku se nevydá nic.
+                return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                    new { error = "ServiceDesk teď neodpovídá, export zkuste za chvíli." });
         }
 
         var bytes = _nesExcelExport.Build(model, localNow);
@@ -124,28 +178,6 @@ public sealed class ProjectDashboardController : BaseController
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             filename);
-    }
-
-    [HttpGet("zakladni-report")]
-    [Authorize(Policy = "permission:dashboard.statistics.view")]
-    public async Task<IActionResult> ZakladniReport(
-        int projektId, int? rok = null, int? kvartal = null,
-        DateTime? od = null, DateTime? doDate = null, CancellationToken ct = default)
-    {
-        if (!await EnsureDashboardAccessAsync(projektId, ct))
-        {
-            return Forbid();
-        }
-
-        var currentYear = TimeZoneInfo.ConvertTime(_timeProvider.GetUtcNow(), TimeZoneInfo.Local).Year;
-        Obdobi obdobi = (od.HasValue && doDate.HasValue)
-            ? Obdobi.Rozsah(od.Value, doDate.Value)
-            : kvartal.HasValue
-                ? Obdobi.Kvartal(rok ?? currentYear, kvartal.Value)
-                : Obdobi.Rok(rok ?? currentYear);
-
-        var model = await _reportBuilder.BuildAsync(projektId, obdobi, ct);
-        return PartialView("~/Views/ProjectDashboard/Zakladni/Report.cshtml", model);
     }
 
     private Task<bool> EnsureDashboardAccessAsync(int projectId, CancellationToken ct)

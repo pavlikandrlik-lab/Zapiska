@@ -1,21 +1,35 @@
 @model PmTracker.Web.Services.ProjectDashboard.Zakladni.ZakladniReportViewModel
-<section class="zr-report" data-zakladni-report data-projekt-id="@Model.ProjektId">
-    <h2 class="zr-report-title">@Model.ProjektNazev</h2>
+@using PmTracker.Web.Services.ProjectDashboard.Zakladni
+@*
+    Záložka Statistiky (spec 2026-10-15 §11): výběr období, pak sekce s nadpisem a jednovětým popisem.
+    Karty grafů jdou dvě vedle sebe (flex-wrap), široké přes celou šířku. Název projektu nese hlavička dashboardu.
+*@
+<section class="pd-report" data-zakladni-report data-projekt-id="@Model.ProjektId" aria-label="Statistiky za období @Model.Obdobi.Label">
     <partial name="~/Views/ProjectDashboard/Zakladni/_ObdobiSelector.cshtml" model="Model" />
     @if (Model.Sections.Count == 0)
     {
-        <p class="muted">Pro toto období zatím nejsou žádné grafy.</p>
+        <p class="pd-chart__empty">Pro toto období zatím nejsou žádné grafy.</p>
     }
     else
     {
         foreach (var sekce in Model.Sections)
         {
-            <div class="zr-section" data-section="@sekce.Key">
-                @foreach (var chart in sekce.Charts)
-                {
-                    <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="chart" />
-                }
-            </div>
+            var (nadpis, popis) = ZakladniSekce.Popis(sekce.Key);
+            <section class="pd-report__section" data-section="@sekce.Key" aria-labelledby="pd-sekce-@sekce.Key">
+                <header class="pd-report__head">
+                    <h2 class="pd-report__title" id="pd-sekce-@sekce.Key">@nadpis</h2>
+                    @if (!string.IsNullOrEmpty(popis))
+                    {
+                        <p class="pd-report__lead">@popis</p>
+                    }
+                </header>
+                <div class="pd-charts">
+                    @foreach (var chart in sekce.Charts)
+                    {
+                        <partial name="~/Views/ProjectDashboard/Zakladni/_Chart.cshtml" model="chart" />
+                    }
+                </div>
+            </section>
         }
     }
 </section>

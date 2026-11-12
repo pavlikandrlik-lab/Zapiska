@@ -16,13 +16,6 @@ public sealed class DisabledInformacniSystemQueryServiceTests
     }
 
     [Fact]
-    public async Task GetProdleneAsync_VraciPrazdny()
-    {
-        var r = await _svc.GetProdleneAsync(1, DateTime.UtcNow, CancellationToken.None);
-        r.Should().BeEmpty();
-    }
-
-    [Fact]
     public async Task GetRozpocetAsync_VraciNull()
     {
         var r = await _svc.GetRozpocetAsync(1, CancellationToken.None);

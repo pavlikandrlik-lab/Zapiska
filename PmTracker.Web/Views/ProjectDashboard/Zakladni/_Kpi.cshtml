@@ -1,0 +1,67 @@
+@model PmTracker.Web.Services.ProjectDashboard.Zakladni.ChartData
+@using PmTracker.Web.Services.ProjectDashboard.Zakladni
+@*
+    Řada KPI dlaždic (spec 2026-10-15 §11.4): hodnota, stav, ukazatel plnění a trend proti předchozímu období.
+    Stav i trend nese text a ikona/šipka, nikdy jen barva.
+*@
+<div class="pd-kpis" data-chart-key="@Model.Key" role="group" aria-label="@Model.Title">
+    @foreach (var s in Model.Stats)
+    {
+        var stav = s.Status switch
+        {
+            CardStatus.Good => "good",
+            CardStatus.Warning => "warning",
+            CardStatus.Critical => "critical",
+            _ => "neutral",
+        };
+        <div class="pd-kpi pd-kpi--@stav">
+            <div class="pd-kpi__label">@s.Label</div>
+            <div class="pd-kpi__value">
+                <span>@s.Value</span>
+                @* Ikony doslovně — GovIconReferencesTests ověřuje existenci souborů. *@
+                @switch (s.Status)
+                {
+                    case CardStatus.Good:
+                        <gov-icon size="s" name="check-circle-fill" type="components" aria-hidden="true"></gov-icon>
+                        <span class="app-sr-only">v pořádku</span>
+                        break;
+                    case CardStatus.Warning:
+                        <gov-icon size="s" name="clock" type="components" aria-hidden="true"></gov-icon>
+                        <span class="app-sr-only">pozor</span>
+                        break;
+                    case CardStatus.Critical:
+                        <gov-icon size="s" name="exclamation-triangle-fill" type="components" aria-hidden="true"></gov-icon>
+                        <span class="app-sr-only">vyžaduje pozornost</span>
+                        break;
+                }
+            </div>
+            @if (s.Progress is double plneni)
+            {
+                var procent = (int)Math.Round(Math.Clamp(plneni, 0, 1) * 100);
+                <div class="pd-kpi__progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@procent" aria-label="@s.Label">
+                    <span class="pd-kpi__progress-bar" style="--pd-progress: @(procent)%"></span>
+                </div>
+            }
+            @if (s.Trend is { } trend)
+            {
+                var smer = trend.JeLepsi ? "better" : trend.JeHorsi ? "worse" : "same";
+                <div class="pd-kpi__trend pd-kpi__trend--@smer" data-kpi-trend="@smer">
+                    <span aria-hidden="true">@(trend.Delta > 0 ? "▲" : trend.Delta < 0 ? "▼" : "＝")</span>
+                    <span>@trend.Text</span>
+                    @if (trend.JeLepsi)
+                    {
+                        <span class="pd-kpi__verdict">lépe</span>
+                    }
+                    else if (trend.JeHorsi)
+                    {
+                        <span class="pd-kpi__verdict">hůř</span>
+                    }
+                </div>
+            }
+            @if (!string.IsNullOrWhiteSpace(s.Note))
+            {
+                <div class="pd-kpi__note">@s.Note</div>
+            }
+        </div>
+    }
+</div>

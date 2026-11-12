@@ -94,6 +94,7 @@ public sealed class TicketingReadOnlyDbContext : DbContext
             e.Property(x => x.Pid).HasColumnName("pid");
             e.Property(x => x.Akceptace).HasColumnName("akceptace");
             e.Property(x => x.Datum).HasColumnName("datum");
+            e.Property(x => x.DatumAkceptace).HasColumnName("datum_akceptace").HasColumnType("smalldatetime");
             e.Property(x => x.PracnostA).HasColumnName("pracnost_a");
             e.Property(x => x.PracnostP).HasColumnName("pracnost_p");
             e.Property(x => x.PracnostT).HasColumnName("pracnost_t");

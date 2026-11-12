@@ -126,4 +126,24 @@ public sealed class ProjectDashboardRecordCategorizationTests
 
         result.ProblematicSteps.Should().BeEmpty();
     }
+
+    [Fact]
+    public void PocetPodleKategorie_pocita_z_radku_a_ma_vsechny_kategorie()
+    {
+        static ProjectDashboardRecordRowViewModel Radek(DashboardRecordCategory k) => new()
+        {
+            CisloViditelne = "1", Nazev = "N", Subsystem = "S", SubsystemKod = "S", Vlastnik = "V", Category = k, ScheduleUrl = "/"
+        };
+        var vm = new ProjectDashboardRecordsPanelViewModel
+        {
+            Records = [Radek(DashboardRecordCategory.Delayed), Radek(DashboardRecordCategory.Delayed), Radek(DashboardRecordCategory.AwaitingActual)]
+        };
+
+        vm.PocetPodleKategorie.Should().BeEquivalentTo(new Dictionary<DashboardRecordCategory, int>
+        {
+            [DashboardRecordCategory.Delayed] = 2,
+            [DashboardRecordCategory.AwaitingActual] = 1,
+            [DashboardRecordCategory.ApproachingDeadline] = 0,
+        });
+    }
 }

@@ -152,17 +152,27 @@ Ostatní: `Neakceptováno`, `Návrh`
 
 ### 5.5 Definice prodlení per typ ticketu
 
-Byznys rozhodnutí 2026-04-23, uzavírá otevřenou otázku D2 ve specu [`dashboard-prodleni.md`](../specs/dashboard-prodleni.md):
+**Platí od 2026-11 (spec [2026-10-15](../superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md) §5, §10).**
+Prodlení se počítá stejně jako ve starém ServiceDesku: port třídy `PenaltyCalculation.TicketPenaltyCalculator`
+(`PmTracker.Web/Services/ServiceDesk/Prodleni/PenaltyCalculator.cs`) nad předávkami z databáze ServiceDesku (§5.13).
 
-| Typ | Termín v prodlení | Filtr |
+| Typ | Termín obrátky | Dny penále |
 |---|---|---|
-| `NES` | `sla_deadline` | `stav != 'archiv' AND sla_deadline < @reference` |
-| `PMP` | `dat_res_t` | `stav != 'archiv' AND dat_res_t < @reference` |
-| `PNF` | `dat_res_t` | `stav != 'archiv' AND dat_res_t < @reference` |
+| `NES` | SLA hodiny podle důležitosti (`ticket_external_sla`), počítané v pracovních dnech po 24 h od předání (U1/U2) | pracovní dny po vyčerpání SLA |
+| `PMP` | `dt_param` předávky U1/U2 (termín plnění), případně schválené prodloužení U11 | kalendářní dny po termínu |
+| `PNF` | jako PMP | pracovní dny po termínu |
 
-**Pouze `NES` mají vyplněné `sla_deadline`.** Pro PMP a PNF je `sla_deadline` v DB systematicky `NULL`.
+- **V prodlení** je ticket, který je **právě u dodavatele** (poslední z předávek U1/U2/U3 je U1 nebo U2) a má penalizované dny > 0.
+  Ticket vrácený zpět (U3) v prodlení není, i když mu z minulých obrátek penále zůstalo (to se počítá jen do Statistik).
+- Ticket u více dodavatelů = řádek na dodavatele (odůvodnění T00); v seznamu jen dodavatel, u kterého ticket právě je.
+- Pracovní dny = bez víkendů a českých svátků (včetně Velkého pátku od 2016).
+- Termín končí v 23:59:59 dne, prodloužení U11 promíjí dny do schváleného data včetně (T14).
+- Důležitost bez řádku v `ticket_external_sla` → **Nelze vyhodnotit** (originál by dosadil 0 h, spec R6).
+- Odůvodnění dnů skládají kódy T00–T14 (`PenaltyReasonFormatter` dává české věty).
 
-**Metrika prodlení** = `DATEDIFF(DAY, @termin, @reference)`. Žádná složitější penalizační logika (U1–U11 transfery, pracovní dny, svátky) — ta je v PM Trackeru **trvale mimo scope**.
+~~Dřívější definice (2026-04-23): NES `sla_deadline < dnes`, PMP/PNF `dat_res_t < dnes`, metrika `DATEDIFF(DAY, termín, dnes)`.~~
+Tato zjednodušená definice ukazovala jiná čísla než ServiceDesk a byla zrušena; dotaz `GetProdleneAsync` je smazaný.
+Navíc se na SQL Serveru nikdy nevyhodnotil (porovnání `id` s prázdným textem se přes převodník přeložilo na `[id] <> NULL`).
 
 ### 5.6 `res_tym` se přepisuje při archivaci
 
@@ -289,6 +299,33 @@ Pro Sprint A a B dashboardu není mapování na `Osoba` potřeba — stačí zob
 **DI registrace:**
 [`AddServiceDeskIntegration(IConfiguration)`](../../PmTracker.ServiceDesk.Sql/ServiceDeskServiceCollectionExtensions.cs) čte `Ticketing:Enabled` z configu a přepíná mezi Sql+Caching vs. Disabled variantami.
 
+### 5.13 Databáze ServiceDesku: `ticket_external*`
+
+Předávky a SLA hodiny nejsou v `intranetNEW`, ale ve **vlastní databázi starého ServiceDesku**
+(v jeho `Web.config` connection string `ServiceDeskEntities`, EF6 model `ServiceDesk.edmx`). PM Tracker ji čte
+read-only přes `ServiceDeskExternalReadOnlyDbContext` (connection string `ServiceDeskExternalReadOnly`, viz `install.md` §7).
+
+| Tabulka | Sloupec | Typ | NULL | Pozn. |
+|---|---|---|---|---|
+| `ticket_external` | `id` | int identity | ne | PK |
+| | `external_id` | varchar(50) | ne | `HOT_ZAZNAMY.id` jako text, páruje se po ořezu mezer; nečíselné hodnoty se ignorují |
+| | `supplier_tag`, `sla_name` | nvarchar(50) | ano | |
+| `ticket_external_workflow` | `id` | int identity | ne | PK, druhý klíč řazení při shodném čase |
+| | `id_ticket_external` | int | ne | FK → `ticket_external.id` |
+| | `date` | datetime | ne | čas předávky |
+| | `transfertype` | int | ano | 1 = U1 založení u dodavatele, 2 = U2 předání, 3 = U3 převzetí zpět, 5 = U5 archivace, 10 = U10 žádost o prodloužení, 11 = U11 schválené prodloužení |
+| | `supplier` | nvarchar(50) | ano | dodavatel předávky |
+| | `dt_param` | datetime | ano | termín plnění (U1/U2 u PMP/PNF) nebo schválený termín (U11) |
+| `ticket_external_sla` | `id` | int identity | ne | PK |
+| | `sla_name` | nvarchar(8) | ne | hodnota `HOT_ZAZNAMY.dulezitost` (NES I … Vada D, Neurčeno); páruje se po ořezu mezer na obou stranách |
+| | `sla_hours` | float | ne | SLA v hodinách |
+
+- **Hodnotí se jen synchronizované tickety** (mají řádek v `ticket_external`). Ostatní se nezobrazují.
+- Ticket patří do IS přes `HOT_ZAZNAMY.modul` → `HOT_MODULY.id_IS`.
+- Spojení obou databází běží v paměti, seznamy id jdou po kouscích ≤ 1 000 (limit parametrů SQL Serveru 2 100).
+- Kód: `PmTracker.ServiceDesk.Sql/SqlProdleniQueryService.cs`, `ServiceDeskExternalReadOnlyDbContext.cs`;
+  lokální replika pro vývoj: `scripts/dev/servicedesk_external_schema.sql` + `scripts/dev/intranetnew_prodleni_seed.sql`.
+
 ## 6. Zpětné linky do ServiceDesku
 
 Detaily ticketu (plný popis, všechna vyjádření, přílohy, historie) se **nepřekopírovávají** do PM Trackeru. Uživatel se z PM Trackeru prokliká zpět do ServiceDesku.
@@ -308,7 +345,7 @@ Base URL je příslušný hostname původní ASP aplikace (varianta `servicedesk
 Následující oblasti zůstávají **mimo scope PM Trackeru** (byznys rozhodnutí 2026-04-23):
 
 - **Přílohy** — fyzický přístup k `./vyjadreni_prilohy/*` ani k `HOT_PRILOHY`. Uživatel jde do ServiceDesku.
-- **Penalizace U1–U11** — žádný parser textu vyjádření, žádná business pravidla penále v korunách.
+- **Penále v Kč** — PM Tracker počítá penalizované **dny** (§5.5), ne částky v korunách. Předávky U1–U11 čte strukturovaně z databáze ServiceDesku (§5.13), parser textu vyjádření se na ně nepoužívá.
 - **Workflow events jako strukturovaná data** — fráze v §5.8 jsou informativní pro porozumění, ne pro implementaci.
 - **Notifikace** (`HOT_UPOZORNENI`) — PM Tracker má vlastní notifikační pipeline.
 - **Audit logy** (`HOT_LOG_*`) — ticketing systém si vede sám.
@@ -342,7 +379,8 @@ Následující oblasti zůstávají **mimo scope PM Trackeru** (byznys rozhodnut
 
 ### Specy a plány
 - [`docs/specs/ticketing-integration.md`](../specs/ticketing-integration.md) — původní návrh (s banner o zastaralosti)
-- [`docs/specs/dashboard-prodleni.md`](../specs/dashboard-prodleni.md) — dashboard prodlení NES/PMP/PNF
+- [`docs/specs/dashboard-prodleni.md`](../specs/dashboard-prodleni.md) — dashboard prodlení NES/PMP/PNF (nahrazeno)
+- [`docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`](../superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md) — přestavba dashboardu, penalizační algoritmus, Statistiky
 - [`docs/superpowers/specs/2026-04-16-projektovy-dashboard-design.md`](../superpowers/specs/2026-04-16-projektovy-dashboard-design.md) — projektový dashboard design
 - [`docs/superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md`](../superpowers/specs/2026-04-21-servicedesk-vytezovani-vyjadreni-design.md) — vytěžování vyjádření
 - [`docs/superpowers/specs/2026-04-22-sync-infra-and-ad-design.md`](../superpowers/specs/2026-04-22-sync-infra-and-ad-design.md) — sync infrastruktura (nahrazuje Hangfire z ticketing-integration.md)
@@ -353,3 +391,4 @@ Následující oblasti zůstávají **mimo scope PM Trackeru** (byznys rozhodnut
 | Datum | Změna | Zdroj |
 |---|---|---|
 | 2026-04-23 | První verze — konsolidace znalostí získaných při discovery SQL + 3 ukázkových ticketů | Brainstorming session, [plán Sprint A](../superpowers/plans/2026-04-23-sd-integrace-sprint-a-backend.md) |
+| 2026-11-11 | §5.5 prodlení podle penalizačního algoritmu ServiceDesku, nová §5.13 databáze ServiceDesku (`ticket_external*`), §7 „Penále v Kč" | [spec 2026-10-15](../superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md), [plán](../superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md) |

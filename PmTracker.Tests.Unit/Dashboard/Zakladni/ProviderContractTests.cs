@@ -22,6 +22,7 @@ public sealed class ProviderContractTests
         var dataset = new ZakladniDataset
         {
             Obdobi = Obdobi.Rok(2025),
+            TaskCategoryIds = [0],
             Records = new[]
             {
                 new DatasetRecord(1, SubsystemId: 7, StavId: 1, DatumZalozeni: new System.DateTime(2025, 2, 1), DatumUkonceni: new System.DateTime(2025, 6, 1)),

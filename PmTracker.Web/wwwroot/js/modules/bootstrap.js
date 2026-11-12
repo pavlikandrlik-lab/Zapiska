@@ -113,12 +113,12 @@ import { initTheme } from "./theme.js";
 import { initTableTools } from "./tableTools.js";
 import { handleDashboardClick, initDashboardShell } from "./dashboard.js";
 import {
-    handleProjectDashboardChange,
     handleProjectDashboardClick,
     initProjectDashboardShell
 } from "./projectDashboard.js";
 import { initZakladniReport } from "./dashboard/zakladniReport.js";
-import { bindEchartsResize, initEchartsReport } from "./dashboard/echartsRender.js";
+import { bindEchartsLifecycle, initEchartsReport } from "./dashboard/echartsRender.js";
+import { initNesPanel } from "./dashboard/nesPanel.js";
 import { initCrossTabNav } from "./crossTabNav.js";
 import { initRecordEditLock } from "./recordEditor/editLock.js";
 
@@ -523,10 +523,6 @@ function handleDocumentChange(event) {
             initRecordSchedulePlanner(form);
         }
     }
-
-    if (handleProjectDashboardChange(target)) {
-        return;
-    }
 }
 
 function handleDocumentInput(event) {
@@ -681,7 +677,8 @@ export function bootstrapPmTrackerApp() {
         () => initProjectDashboardShell(),
         () => initZakladniReport(),
         () => initEchartsReport(document),
-        () => bindEchartsResize(),
+        () => bindEchartsLifecycle(),
+        () => initNesPanel(),
         // Pořadí: editLock musí být PŘED keep-alive koordinátorem — ten si při prvním
         // běhu čte data-record-edit-lock-id z <html> a posílá ho jako heartbeat.
         () => initRecordEditLock(),
