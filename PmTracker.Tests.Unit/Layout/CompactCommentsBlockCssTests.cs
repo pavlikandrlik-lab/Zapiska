@@ -39,7 +39,7 @@ public sealed class CompactCommentsBlockCssTests
         row.Should().Contain("border: 0");
         row.Should().Contain("display: flow-root");
         row.Should().Contain("overflow: visible",
-            "základní .comment (sdílený s _TaskItemPartial) má overflow: hidden — v bloku by ořízl bublinu i ikony");
+            "základní .comment má overflow: hidden — v bloku by ořízl bublinu i ikony");
         Regex.IsMatch(Css, @"\.record-comments \.comment:hover,\s*\.record-comments \.comment:focus-within\s*\{[^}]*background: var\(--background-neutral-subtle\)")
             .Should().BeTrue("jemně šedé podbarvení řádku pod myší i při fokusu (R2, R9)");
     }

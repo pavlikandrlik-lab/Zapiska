@@ -292,43 +292,6 @@ export async function refreshRecordComments(payload) {
     }));
 }
 
-export async function refreshMeetingTaskItem(payload) {
-    const refreshUrl = typeof payload.refreshUrl === "string" ? payload.refreshUrl : "";
-    const recordId = payload.recordId != null ? String(payload.recordId) : "";
-    if (!refreshUrl || !recordId) {
-        return;
-    }
-
-    const currentTask = document.querySelector(`.task-item[data-task-record-id="${CSS.escape(recordId)}"]`);
-    if (!(currentTask instanceof HTMLElement)) {
-        return;
-    }
-
-    const beforeTop = currentTask.getBoundingClientRect().top;
-    const previousSortDirection = currentTask.getAttribute("data-comment-sort-direction") === "desc" ? "desc" : "asc";
-
-    const html = await fetchHtmlFragment(refreshUrl);
-    const parsed = new DOMParser().parseFromString(html, "text/html");
-    const replacementTask = parsed.querySelector(".task-item[data-task-record-id]");
-    if (!(replacementTask instanceof HTMLElement)) {
-        throw new Error("Nepodařilo se načíst aktualizovaný blok úkolu.");
-    }
-
-    currentTask.replaceWith(replacementTask);
-    navigationRuntime.initRecordFormEnhancements?.(replacementTask);
-
-    const refreshedTask = document.querySelector(`.task-item[data-task-record-id="${CSS.escape(recordId)}"]`);
-    if (refreshedTask instanceof HTMLElement) {
-        applyRecordCommentSortDirection(refreshedTask, previousSortDirection);
-
-        const afterTop = refreshedTask.getBoundingClientRect().top;
-        const delta = afterTop - beforeTop;
-        if (Math.abs(delta) > 1) {
-            window.scrollBy({ top: delta, behavior: "auto" });
-        }
-    }
-}
-
 export function replaceSelectorFromDocument(nextDoc, selector) {
     const current = document.querySelector(selector);
     const replacement = nextDoc.querySelector(selector);
@@ -419,12 +382,6 @@ export async function refreshPageScope(payload) {
         // v aktuálním — bez přepnutí by dlaždice v railu nebyla a výběr by spadl na buffer.
         const rok = new URL(refreshUrl, window.location.origin).searchParams.get("rok") || undefined;
         await window.pmVyzvy?.reloadCurrentPanel?.({ vybrat, rok });
-        return;
-    }
-
-    if (scope === "meeting-task-item") {
-        await refreshMeetingTaskItem(payload);
-        initCommentSortUi(document);
         return;
     }
 

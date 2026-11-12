@@ -64,9 +64,6 @@
         <div class="comment-list" data-comment-list>
             @foreach (var vyjadreni in Model.Vyjadreni)
             {
-                var canEditThisComment = vyjadreni.LzeUpravit
-                    && (Model.CanEditRecord
-                        || (vyjadreni.CanEditOwnAsSubsystemLeader && vyjadreni.AutorOsobaId == Model.CurrentUserOsobaId));
                 var metaId = $"vyjadreni-meta-{vyjadreni.Id}";
                 var meetingLabel = vyjadreni.JednaniCislo.HasValue
                     ? (vyjadreni.JednaniDatum.HasValue
@@ -76,8 +73,8 @@
                 @*
                     Spec 2026-10-22 (vyjádření v jednom bloku): řádek bez vlastního rámečku, vpravo float
                     se štítkem jednání; autor a datum jen v bublině štítku (hover / fokus), Upravit a Smazat
-                    jen jako ikony řádku při :hover / :focus-within — a jen kde canEditThisComment
-                    (LzeUpravit = jednání není uzavřené).
+                    jen jako ikony řádku při :hover / :focus-within. Tužka a koš podle příznaků ze serveru
+                    (CommentService.GetCommentActionsAsync, spec 2026-11-10 R6) — co se ukáže, server přijme.
                 *@
                 <div class="comment"
                      data-comment-item
@@ -85,12 +82,17 @@
                      data-comment-date="@vyjadreni.Datum.ToString("O")"
                      data-comment-id="@vyjadreni.Id">
                     <div class="comment-side">
-                        @if (canEditThisComment)
+                        @if (vyjadreni.SmiUpravit || vyjadreni.SmiSmazat)
                         {
                             <div class="comment-row-actions" data-comment-row-actions>
+                                @if (vyjadreni.SmiUpravit)
+                                {
                                 <pm-button variant="Secondary" size="Small" data-comment-edit-toggle="true" aria-label="Upravit vyjádření" title="Upravit vyjádření">
                                     <gov-icon size="s" name="pencil" type="components" aria-hidden="true"></gov-icon>
                                 </pm-button>
+                                }
+                                @if (vyjadreni.SmiSmazat)
+                                {
                                 <form class="comment-delete-form comment-delete-form-inline" asp-controller="Zaznamy" asp-action="DeleteComment" method="post" data-ajax-submit="true" onsubmit="return confirm('Opravdu smazat vyjádření?');">
                                     <input type="hidden" name="projektId" value="@Model.ProjektId" />
                                     <input type="hidden" name="uiContext" value="project" />
@@ -104,6 +106,7 @@
                                         <gov-icon size="s" name="trash3" type="components" aria-hidden="true"></gov-icon>
                                     </pm-button>
                                 </form>
+                                }
                             </div>
                         }
                         <span class="chip-wrap">
@@ -115,7 +118,7 @@
                         </span>
                     </div>
                     <div class="comment-text richtext-render" data-comment-text>@Html.Raw(RichTextContentService.ToSafeHtml(vyjadreni.Text))</div>
-                    @if (canEditThisComment)
+                    @if (vyjadreni.SmiUpravit)
                     {
                         <form class="comment-edit-form" asp-controller="Zaznamy" asp-action="UpdateComment" method="post" data-ajax-submit="true" data-comment-edit-form hidden>
                             <input type="hidden" name="projektId" value="@Model.ProjektId" />

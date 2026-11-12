@@ -110,6 +110,31 @@ duplikoval obsah.
   `CompactCommentsBlockRenderTests`, `ClosedRecordCommentsRenderTests`, `ClosedMeetingCommentChangesTests`.
 - E2E: `RecordRichTextScenariosTests.RecordComments_ShouldLoadTenThenExpandWhilePreservingSortOnLoadedSubset`,
   `CompactCommentsBlockScenariosTests`.
+- Oprávnění (spec 2026-11-10): Unit `CommentAuthorizationPolicyTests.Matice_R1` (+ samostatné případy),
+  `CommentActionsTests`, `ProjectRoleCacheTests`; Api `CommentRoleMatrixServerTests` (podvržené požadavky),
+  `CommentIconsByRoleRenderTests` (ikony podle role).
+
+---
+
+## Kdo smí přidat, upravit a smazat (spec 2026-11-10)
+
+Spec: `docs/superpowers/specs/2026-11-10-vyjadreni-uprava-podle-role-design.md`. Uzavřené jednání = nikdo nic.
+
+| Role | Přidat | Upravit / smazat vlastní | Upravit / smazat cizí |
+|---|---|---|---|
+| Superadmin, Admin aplikace, Vlastník, Admin projektu, PM | Příprava i Otevřeno, všechny subsystémy | ano | ano |
+| Gestor | Příprava i Otevřeno, všechny subsystémy | Příprava i Otevřeno | ne |
+| Vedoucí, Zástupce vedoucího, Metodik subsystému | jen Příprava, jen záznamy svého subsystému | jen Příprava, jen svůj subsystém | ne |
+| Host, Read-all | ne | ne | ne |
+
+- **Jedno pravidlo pro vlastní vyjádření:** smí ho upravit a smazat, kdo by ho teď na tomtéž místě smel přidat;
+  úprava navíc vyžaduje `comments.edit.own`, smazání `comments.delete.own`. Cizí jen s `comments.edit.any` / `comments.delete.any`.
+- **„Vyšší bere“:** přímá projektová role s `comments.add` (Gestor, PM …) přebíjí subsystémovou roli.
+- **Výjimka 2026-06-16:** vedoucí a zástupce s `meetings.notes.subsystemlead` smí v Přípravě u svého subsystému i bez klíčů `comments.*`.
+- **Kde se počítá:** `CommentAuthorizationPolicy` (`CanAddComment`, `CanEditComment`, `CanDeleteComment`) nad `CommentScope`,
+  který skládá jen `CommentService.ResolveCommentScopeAsync` (osoby subsystémových rolí z `ProjectRoleCache.GetSubsystemRoleOsobaIds*`).
+  Totéž pravidlo používá uložení, nabídka jednání ve formuláři (`GetMeetingIdsAllowingNewCommentAsync`) i ikony
+  (`GetCommentActionsAsync` → `VyjadreniViewModel.SmiUpravit` / `SmiSmazat`). Šablona podmínku neskládá.
 
 ---
 

@@ -133,8 +133,6 @@ public sealed partial class ZaznamyController
         // records.comment.subsystemlead → meetings.notes.subsystemlead.
         var canCreateScheduleProposal = summary.JeUkol
             && CurrentUserContext.HasPermission(PermissionKeys.ProposalsScheduleCreate, projektId);
-        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projektId)
-            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
 
         summary.CanEditRecord = canEditRecord;
         summary.CanEditSchedule = canEditSchedule;
@@ -144,7 +142,6 @@ public sealed partial class ZaznamyController
         // ale klik = 403. Obě cesty musí renderovat identickou kartu (toggle spec 2026-07-13).
         summary.CanManageSchedule = canEditSchedule;
         summary.CanCreateScheduleProposal = canCreateScheduleProposal;
-        summary.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
         summary.EditButtonLabel = canEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         record.DetailUrl ??= Url.Action(nameof(RecordDetailPartial), new { projektId, zaznamId = summary.Id });
@@ -163,8 +160,6 @@ public sealed partial class ZaznamyController
     private async Task PrepareRecordCommentsPresentationAsync(ZaznamCommentsPanelViewModel model, ZaznamCardSummaryViewModel summary, CancellationToken ct)
     {
         var canEditRecord = CurrentUserContext.HasPermission(PermissionKeys.RecordsEdit, model.ProjektId);
-        var canCommentAsSubsystemLead = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, model.ProjektId)
-            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
 
         if (model.IsRecordClosed)
         {
@@ -185,7 +180,15 @@ public sealed partial class ZaznamyController
 
         model.CurrentUserOsobaId = CurrentUserContext.OsobaId;
         model.CanEditRecord = canEditRecord;
-        model.CanCommentAsSubsystemLeader = canCommentAsSubsystemLead;
+        // Spec 2026-11-10 R6: tužka a koš podle téhož pravidla, kterým server úpravu a smazání kontroluje.
+        var commentActions = await _recordService.GetCommentActionsAsync(
+            summary.Id, model.Vyjadreni.Select(x => x.Id).ToList(), CurrentUserContext, ct);
+        foreach (var vyjadreni in model.Vyjadreni)
+        {
+            var actions = commentActions.GetValueOrDefault(vyjadreni.Id);
+            vyjadreni.SmiUpravit = actions?.CanEdit ?? false;
+            vyjadreni.SmiSmazat = actions?.CanDelete ?? false;
+        }
         model.CanAddComment = !model.IsRecordClosed && model.OtevrenaJednani.Count > 0;
         // Předvolba z detailu jednání jen z povolené nabídky — cizí / nepovolené jednání se tiše
         // ignoruje (plán 2026-10-21, D1/D2); jiné jednání jde dál vybrat na kliknutí.

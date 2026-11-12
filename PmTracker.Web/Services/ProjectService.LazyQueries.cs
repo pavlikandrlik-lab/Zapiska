@@ -383,9 +383,7 @@ public sealed partial class ProjectService
                         Text = comment.TextVyjadreni,
                         JednaniCislo = meeting?.CisloJednani,
                         JednaniDatum = meeting?.DatumPlanovane,
-                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState),
-                        CanEditOwnAsSubsystemLeader = !IsMeetingReadOnly(meeting, meetingState)
-                            && string.Equals(meetingState?.Kod, "DRAFT", StringComparison.OrdinalIgnoreCase)
+                        LzeUpravit = !IsMeetingReadOnly(meeting, meetingState)
                     };
                 })
                 .ToList()
@@ -518,7 +516,6 @@ public sealed partial class ProjectService
             : subsystemIds.Where(allSubsystems.ContainsKey).ToDictionary(id => id, id => allSubsystems[id]);
         var subsystemOrderById = await BuildActiveProjectSubsystemOrderBySubsystemIdAsync(projectId, subsystemIds, ct);
         var people = await LoadPeopleByIdsAsync(ownerIds, ct);
-        var leadEquivalentOsobaIdsBySubsystem = await BuildLeadEquivalentOsobaIdsByProjectSubsystemAsync(projectId, ct);
 
         // Které záznamy mají aspoň jednu vyplněnou hodnotu harmonogramu (plán NEBO skutečnost) —
         // řídí zařazení do harmonogramu i viditelnost překlikového tlačítka. Predikát zrcadlí
@@ -565,7 +562,6 @@ public sealed partial class ProjectService
                 AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
                 AktualniSubsystemPoradi = hasProjectOrder ? subsystemOrder : 0,
                 AktualniSubsystemHasProjectOrder = hasProjectOrder,
-                AktualniSubsystemLeadEquivalentOsobaIds = leadEquivalentOsobaIdsBySubsystem.GetValueOrDefault(record.SubsystemId, []),
                 DatumZalozeni = record.DatumZalozeni,
                 AktualniVlastnikId = record.VlastnikId
             };
@@ -693,9 +689,9 @@ public sealed partial class ProjectService
                 HistorieTypuUkolu = Array.Empty<string>(),
                 AktualniSubsystemKod = string.IsNullOrWhiteSpace(currentSubsystem?.Kod) ? (currentSubsystem?.Nazev ?? string.Empty) : currentSubsystem.Kod,
                 AktualniSubsystem = currentSubsystem?.Nazev ?? "-",
+                AktualniSubsystemLeadEquivalentOsobaIds = Array.Empty<int>(),
                 AktualniSubsystemPoradi = hasProjectOrder ? subsystemOrder : 0,
                 AktualniSubsystemHasProjectOrder = hasProjectOrder,
-                AktualniSubsystemLeadEquivalentOsobaIds = Array.Empty<int>(),
                 ExterniOdkazy = Array.Empty<ExterniOdkazViewModel>(),
                 Spoluprace = Array.Empty<SpolupracovnikViewModel>(),
                 Vyjadreni = Array.Empty<VyjadreniViewModel>(),

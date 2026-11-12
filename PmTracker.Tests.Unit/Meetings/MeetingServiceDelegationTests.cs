@@ -67,6 +67,9 @@ public sealed class MeetingServiceDelegationTests
         public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.FromResult<IReadOnlySet<int>>(new HashSet<int>());
 
+        public Task<IReadOnlyDictionary<int, CommentActions>> GetCommentActionsAsync(int zaznamId, IReadOnlyCollection<int> commentIds, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyDictionary<int, CommentActions>>(new Dictionary<int, CommentActions>());
+
         public Task SaveMeetingNoteAsync(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.CompletedTask;
 

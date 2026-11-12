@@ -8,18 +8,14 @@ public sealed class RecordUiFlowResolverTests
     private readonly RecordUiFlowResolver _sut = new();
 
     [Fact]
-    public void ResolveCommentAjaxFlow_ShouldReturnMeetingRefresh_WhenMeetingContextProvided()
+    public void ResolveCommentAjaxFlow_MeetingContext_ObnoviPanelVyjadreni()
     {
-        var result = _sut.ResolveCommentAjaxFlow("meeting", 17, 31, 44);
+        var result = _sut.ResolveCommentAjaxFlow("meeting", 17, 31, 44, kontextJednaniId: 44);
 
-        result.RefreshScope.Should().Be("meeting-task-item");
-        result.ControllerName.Should().Be("Jednani");
-        result.ActionName.Should().Be("TaskItemPartial");
-        result.RouteValues["jednaniId"].Should().Be(44);
-        result.RouteValues["zaznamId"].Should().Be(31);
-        result.UiContext.Should().Be("meeting");
-        result.MeetingId.Should().Be(44);
-        result.Tab.Should().BeNull();
+        result.RefreshScope.Should().Be("record-comments", "obnovení bloku úkolu jednání (_TaskItemPartial) zaniklo (spec 2026-11-10 R8)");
+        result.ActionName.Should().Be("RecordCommentsPartial");
+        result.RouteValues["kontextJednaniId"].Should().Be(44);
+        result.MeetingId.Should().BeNull();
     }
 
     [Fact]
@@ -47,14 +43,16 @@ public sealed class RecordUiFlowResolverTests
     }
 
     [Fact]
-    public void ResolveCommentRedirectFlow_ShouldReturnMeetingDetail_WhenMeetingContextProvided()
+    public void ResolveCommentRedirectFlow_MeetingContext_VratiNaZaznamyProjektu()
     {
-        var result = _sut.ResolveCommentRedirectFlow("meeting", 17, 55, "/ignored");
+        // „meeting“ posílaly jen formuláře zrušeného _TaskItemPartial (spec 2026-11-10 R8).
+        var result = _sut.ResolveCommentRedirectFlow("meeting", 17, 55, null);
 
         result.IsLocalRedirect.Should().BeFalse();
-        result.ControllerName.Should().Be("Jednani");
+        result.ControllerName.Should().Be("Projekty");
         result.ActionName.Should().Be("Detail");
-        result.RouteValues["id"].Should().Be(55);
+        result.RouteValues["id"].Should().Be(17);
+        result.RouteValues["tab"].Should().Be("zaznamy");
     }
 
     [Fact]

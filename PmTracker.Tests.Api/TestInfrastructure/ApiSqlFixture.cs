@@ -188,11 +188,16 @@ public sealed class ApiSqlFixture : IAsyncLifetime
             .FirstOrDefaultAsync();
         if (!projectSubsystemId.HasValue)
         {
+            // Pořadí aktivních subsystémů projektu je unikátní (UX_projekt_subsystemy_projekt_poradi_aktivni)
+            // — druhý subsystém téhož projektu dostane další volné pořadí.
+            var nextOrder = (await dbContext.ProjektSubsystemy
+                .Where(x => x.ProjektId == projectId && x.DatumOdebrani == null)
+                .MaxAsync(x => (int?)x.Poradi) ?? 0) + 1;
             var link = new ProjektSubsystemEntity
             {
                 ProjektId = projectId,
                 SubsystemId = subsystemId,
-                Poradi = 1,
+                Poradi = nextOrder,
                 DatumPrirazeni = DateTime.UtcNow
             };
             dbContext.ProjektSubsystemy.Add(link);
@@ -595,19 +600,22 @@ public sealed class ApiSqlFixture : IAsyncLifetime
         await dbContext.SaveChangesAsync();
     }
 
-    public async Task AddCommentAsync(int recordId, int meetingId, int authorOsobaId, string text)
+    /// <summary>Vloží vyjádření přímo do DB (bez kontroly oprávnění); vrací jeho id.</summary>
+    public async Task<int> AddCommentAsync(int recordId, int meetingId, int authorOsobaId, string text)
     {
         await using var dbContext = CreateDbContext();
 
-        dbContext.Vyjadreni.Add(new VyjadreniEntity
+        var comment = new VyjadreniEntity
         {
             ZaznamId = recordId,
             JednaniId = meetingId,
             AutorOsobaId = authorOsobaId,
             TextVyjadreni = text,
             DatumVyjadreni = DateTime.Now
-        });
+        };
+        dbContext.Vyjadreni.Add(comment);
         await dbContext.SaveChangesAsync();
+        return comment.Id;
     }
 
     public async Task EnsureProjectTeamMemberAsync(int projectId, int osobaId)
