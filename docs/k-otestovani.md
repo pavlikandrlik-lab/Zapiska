@@ -406,7 +406,7 @@ Navíc:
 
 ## 11. Dashboard projektu — přestavba, NES v prodlení podle ServiceDesku, nové Statistiky
 
-**Hotovo 2026-11-11:** merge `MERGE_HASH`, spec `docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`, plán `docs/superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md`.
+**Hotovo 2026-11-12:** merge `b583bc24`, spec `docs/superpowers/specs/2026-10-15-dashboard-prestavba-prodleni-statistiky-design.md`, plán `docs/superpowers/plans/2026-10-15-dashboard-prestavba-prodleni-statistiky.md`.
 
 **Nasazení — nový connection string (bez změny schématu PM Trackeru):**
 - `ConnectionStrings:ServiceDeskExternalReadOnly` = databáze starého ServiceDesku (z jeho `Web.config`, `ServiceDeskEntities`), `Ticketing:ExternalConnectionStringName = ServiceDeskExternalReadOnly`, `Ticketing:Enabled = true`. Návod v `install.md` §7.
@@ -423,7 +423,7 @@ Navíc:
 - **Oprava, která se ukázala až proti SQL Serveru:** stará záložka NES na ostrém serveru nikdy nic neukázala. Dotaz porovnával číslo ticketu s prázdným textem a to se přeložilo na `[id] <> NULL`. Nový dotaz to nemá a hlídá ho test vygenerovaného SQL.
 
 **Ověřeno lokálně:**
-- Unit 2522, Api 559, JS 108, Integration (loader) zelené.
+- Na sloučeném kódu (včetně vyjádření §10): Unit 2541, Api 568, JS 108, Integration 208 — vše zelené. E2E 120 testů: 22 selhání, stejná jména jako známá baseline, nová žádná.
 - Prohlížeč (Playwright, skutečné kliky) proti lokální SQL replice ServiceDesku (`scripts/dev/servicedesk_external_schema.sql`, `scripts/dev/intranetnew_prodleni_seed.sql`): **11 rolí** + osoba bez přístupu; světlý i tmavý motiv, 1440 a 390 px bez horizontálního posuvu; dlaždice → záložka, rozbalení řádků myší i Enterem, filtry, sekce Hrozí/Nelze, stažení Excelu, Statistiky rok → Q3 → zpět, přepnutí motivu s otevřenými grafy, projekt bez IS. 0 chyb v konzoli a HTTP.
 
 **Otestovat (PM nebo admin projektu, ne superadmin; i15 / Edge):**
