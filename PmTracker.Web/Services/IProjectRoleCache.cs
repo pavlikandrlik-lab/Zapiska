@@ -32,4 +32,19 @@ public interface IProjectRoleCache
         int projectId,
         int subsystemId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Mapping <c>subsystemId → osobaIds</c> pro osoby s aktivní rolí <b>vedoucí, zástupce nebo metodik</b>
+    /// subsystému na projektu. Pro vyjádření (spec 2026-11-10 R3): subsystémové role smí přidávat,
+    /// upravovat a mazat vlastní vyjádření jen u záznamů svého subsystému. Cache jako u lead-equivalent.
+    /// </summary>
+    Task<IReadOnlyDictionary<int, IReadOnlyList<int>>> GetSubsystemRoleOsobaIdsBySubsystemAsync(
+        int projectId,
+        CancellationToken ct = default);
+
+    /// <summary>Výřez <see cref="GetSubsystemRoleOsobaIdsBySubsystemAsync"/> pro jeden subsystém; prázdný list, když nikdo.</summary>
+    Task<IReadOnlyList<int>> GetSubsystemRoleOsobaIdsAsync(
+        int projectId,
+        int subsystemId,
+        CancellationToken ct = default);
 }
