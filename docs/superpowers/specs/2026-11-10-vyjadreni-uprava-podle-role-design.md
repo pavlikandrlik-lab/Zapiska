@@ -1,7 +1,7 @@
 # Vyjádření: kdo smí přidat, upravit a smazat — sjednocení UI a serveru — specifikace
 
 **Datum:** 2026-11-10
-**Stav:** návrh ke schválení
+**Stav:** schváleno 2026-11-11, implementováno (plán `docs/superpowers/plans/2026-11-11-vyjadreni-uprava-podle-role.md`)
 **Navazuje na:** rozhodnutí 2026-06-16 (vícevrstvá autorizace vyjádření vedoucího subsystému, `CommentAuthorizationPolicy`), spec `2026-10-22-vyjadreni-kompaktni-blok-design.md` (kap. 5.4 — známý nesoulad, který tato spec řeší)
 **Komponenty:** pravidla (`Services/Common/CommentAuthorizationPolicy.cs`), uložení (`Services/CommentService.cs`), osoby subsystémových rolí (`Services/ProjectRoleCache.cs`), vykreslení ikon (`Views/Projekty/_ZaznamCommentsPartial.cshtml`), příprava panelu vyjádření (`Controllers/ZaznamyController.Partials.cs`)
 
