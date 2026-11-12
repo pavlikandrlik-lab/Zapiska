@@ -78,10 +78,6 @@ public abstract partial class BaseController
         // (CanCreateScheduleProposal → ScheduleProposalUrl). Dřív sem prosakoval canCreateScheduleProposal
         // → vedoucí subsystému viděl tužku na cizích záznamech, ale klik = 403.
         summary.CanManageSchedule = summary.CanEditSchedule;
-        // F4 redesign: UI flag pro „přidat komentář za vedoucího subsystému" = meetings.notes.subsystemlead
-        // (per-action klíč pro zápis v jednání).
-        summary.CanCommentAsSubsystemLeader = CurrentUserContext.HasPermission(PermissionKeys.MeetingsNotesSubsystemLead, projectId)
-            && summary.AktualniSubsystemLeadEquivalentOsobaIds.Contains(CurrentUserContext.OsobaId);
         summary.CanCreateScheduleProposal = canCreateScheduleProposal;
         summary.EditButtonLabel = summary.CanEditRecord ? "Upravit" : "GANTT";
         summary.CurrentUserOsobaId = CurrentUserContext.OsobaId;

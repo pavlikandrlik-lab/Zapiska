@@ -76,7 +76,6 @@ public sealed class ZaznamCardSummaryViewModel
     public required string AktualniSubsystem { get; init; }
     public int AktualniSubsystemPoradi { get; init; }
     public bool AktualniSubsystemHasProjectOrder { get; init; }
-    public IReadOnlyList<int> AktualniSubsystemLeadEquivalentOsobaIds { get; init; } = Array.Empty<int>();
     public bool IsAktivniStav { get; init; } = true;
     public bool JeUkol { get; init; }
     /// <summary>
@@ -92,7 +91,6 @@ public sealed class ZaznamCardSummaryViewModel
     // F4 redesign 2026-04-23: CanAddSchedule smazáno — records.schedule.add obsolete,
     // uživatelé bez RecordsScheduleEdit musí přes ProposalsScheduleCreate (viz CanCreateScheduleProposal).
     public bool CanManageSchedule { get; set; }
-    public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanCreateScheduleProposal { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
     public string? ScheduleProposalUrl { get; set; }
@@ -131,7 +129,6 @@ public sealed class ZaznamCommentsPanelViewModel
     public bool IsFullyLoaded { get; init; }
     public bool IsRecordClosed { get; init; }
     public bool CanEditRecord { get; set; }
-    public bool CanCommentAsSubsystemLeader { get; set; }
     public bool CanAddComment { get; set; }
     public int CurrentUserOsobaId { get; set; }
     public IReadOnlyList<VyjadreniViewModel> Vyjadreni { get; init; } = Array.Empty<VyjadreniViewModel>();
@@ -188,7 +185,6 @@ public sealed class ZaznamCardViewModel
     public bool CanEditSchedule { get; set; }
     // F4 redesign 2026-04-23: CanAddSchedule smazáno (viz ZaznamCardSummaryViewModel).
     public bool CanManageSchedule { get; set; }
-    public bool CanCommentAsSubsystemLeader { get; set; }
     public string EditButtonLabel { get; set; } = "Upravit";
     public int CurrentUserOsobaId { get; set; }
 }
@@ -222,7 +218,12 @@ public sealed class VyjadreniViewModel
     public int? JednaniCislo { get; init; }
     public DateTime? JednaniDatum { get; init; }
     public bool LzeUpravit { get; init; }
-    public bool CanEditOwnAsSubsystemLeader { get; init; }
+
+    /// <summary>Tužka: server úpravu přijme (CommentService.GetCommentActionsAsync, spec 2026-11-10 R6).</summary>
+    public bool SmiUpravit { get; set; }
+
+    /// <summary>Koš: server smazání přijme (CommentService.GetCommentActionsAsync, spec 2026-11-10 R6).</summary>
+    public bool SmiSmazat { get; set; }
 }
 
 public sealed class SpolupracovnikViewModel

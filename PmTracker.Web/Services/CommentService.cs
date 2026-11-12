@@ -348,6 +348,73 @@ public sealed class CommentService(
             .ToHashSet();
     }
 
+    public async Task<IReadOnlyDictionary<int, CommentActions>> GetCommentActionsAsync(
+        int zaznamId,
+        IReadOnlyCollection<int> commentIds,
+        CurrentUserContextViewModel currentUser,
+        CancellationToken ct = default)
+    {
+        var result = new Dictionary<int, CommentActions>();
+        if (commentIds.Count == 0)
+        {
+            return result;
+        }
+
+        var record = await dbContext.ProjektoveZaznamy
+            .AsNoTracking()
+            .Where(x => x.Id == zaznamId)
+            .Select(x => new { x.ProjektId, x.SubsystemId })
+            .FirstOrDefaultAsync(ct);
+        if (record is null)
+        {
+            return result;
+        }
+
+        var ids = commentIds.Distinct().ToList();
+        var comments = await dbContext.Vyjadreni
+            .AsNoTracking()
+            .Where(x => x.ZaznamId == zaznamId && ids.Contains(x.Id))
+            .Select(x => new { x.Id, x.JednaniId, x.AutorOsobaId })
+            .ToListAsync(ct);
+        var meetingIds = comments.Select(x => x.JednaniId).Distinct().ToList();
+        var meetings = await dbContext.Jednani
+            .AsNoTracking()
+            .Where(x => meetingIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+        var stateIds = meetings.Values.Select(x => x.StavJednaniId).Distinct().ToList();
+        var states = await dbContext.CiselnikStavuJednani
+            .AsNoTracking()
+            .Where(x => stateIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, ct);
+
+        var draftScope = await ResolveCommentScopeAsync(record.ProjektId, record.SubsystemId, isDraftMeeting: true, ct);
+        var openScope = draftScope with { IsDraftMeeting = false };
+
+        foreach (var comment in comments)
+        {
+            if (!meetings.TryGetValue(comment.JednaniId, out var meeting) || meeting.ProjektId != record.ProjektId)
+            {
+                // Orphan / neplatná vazba — server úpravu odmítne, smazání (úklid) jen SuperAdmin (DeleteCommentAsync).
+                result[comment.Id] = new CommentActions(false, currentUser.IsSuperAdmin && meeting is null);
+                continue;
+            }
+
+            var state = states.GetValueOrDefault(meeting.StavJednaniId);
+            if (MeetingStatePolicy.IsReadOnly(meeting, state))
+            {
+                result[comment.Id] = new CommentActions(false, false);
+                continue;
+            }
+
+            var scope = IsDraftMeeting(state) ? draftScope : openScope;
+            result[comment.Id] = new CommentActions(
+                commentAuthorizationPolicy.CanEditComment(currentUser, scope, comment.AutorOsobaId),
+                commentAuthorizationPolicy.CanDeleteComment(currentUser, scope, comment.AutorOsobaId));
+        }
+
+        return result;
+    }
+
     /// <summary>
     /// Vstup pravidel vyjádření (spec 2026-11-10) — jediné místo výpočtu, sdílené přidáním, úpravou,
     /// smazáním, nabídkou jednání i příznaky ikon. Osoby subsystémových rolí se berou pro subsystém

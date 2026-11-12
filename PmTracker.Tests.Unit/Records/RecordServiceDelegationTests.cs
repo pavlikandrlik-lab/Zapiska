@@ -30,6 +30,21 @@ public sealed class RecordServiceDelegationTests
         commentService.LastAddCommentUser.Should().BeSameAs(currentUser);
     }
 
+    [Fact]
+    public async Task GetCommentActionsAsync_DelegatesToCommentService()
+    {
+        var commentService = new FakeCommentService();
+        var sut = new RecordService(null!, null!, commentService, null!, null!, null!, new FakePendingScheduleProposalLockEvaluator(), new FakePriorityMatrixRebuildService(), new FakeAuditWriteService(), new FakeHarvestScheduler(), null!, null!, TimeProvider.System);
+        var currentUser = BuildCurrentUser();
+
+        var result = await sut.GetCommentActionsAsync(13, [5, 6], currentUser);
+
+        result.Should().BeSameAs(commentService.CommentActionsResult);
+        commentService.LastCommentActionsZaznamId.Should().Be(13);
+        commentService.LastCommentActionsIds.Should().Equal(5, 6);
+        commentService.LastCommentActionsUser.Should().BeSameAs(currentUser);
+    }
+
     private static CurrentUserContextViewModel BuildCurrentUser()
     {
         return new CurrentUserContextViewModel
@@ -79,6 +94,19 @@ public sealed class RecordServiceDelegationTests
 
         public Task<IReadOnlySet<int>> GetMeetingIdsAllowingNewCommentAsync(int zaznamId, IReadOnlyCollection<JednaniOptionViewModel> meetings, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.FromResult<IReadOnlySet<int>>(new HashSet<int>());
+
+        public IReadOnlyDictionary<int, CommentActions> CommentActionsResult { get; } = new Dictionary<int, CommentActions> { [5] = new(true, false) };
+        public int LastCommentActionsZaznamId { get; private set; }
+        public IReadOnlyCollection<int>? LastCommentActionsIds { get; private set; }
+        public CurrentUserContextViewModel? LastCommentActionsUser { get; private set; }
+
+        public Task<IReadOnlyDictionary<int, CommentActions>> GetCommentActionsAsync(int zaznamId, IReadOnlyCollection<int> commentIds, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
+        {
+            LastCommentActionsZaznamId = zaznamId;
+            LastCommentActionsIds = commentIds;
+            LastCommentActionsUser = currentUser;
+            return Task.FromResult(CommentActionsResult);
+        }
 
         public Task SaveMeetingNoteAsync(SaveMeetingNoteCommand command, CurrentUserContextViewModel currentUser, CancellationToken ct = default)
             => Task.CompletedTask;
